@@ -63,7 +63,11 @@ function mesaj(kutu, sinif, metin) {
   kutu.textContent = metin;
   kutu.style.display = metin ? 'block' : 'none';
 }
-function hataMetni(s, varsayilan) { return (s && s.j && s.j.mesaj) || varsayilan || 'İşlem başarısız.'; }
+function hataMetni(s, varsayilan) {
+  const m = (s && s.j && s.j.mesaj) || varsayilan || 'İşlem başarısız.';
+  const k = s && s.j && s.j.hata_kodu;
+  return k ? m + ' (hata kodu: ' + k + ')' : m;
+}
 function tarih(iso) {
   if (!iso) return '-';
   const d = new Date(iso);
