@@ -18,7 +18,7 @@ function xlsxYukle() {
 // ---------------- Alan tanimlari ve otomatik eslestirme ----------------
 const YUKLEME_ALANLARI = [
   ['unvan', 'Firma ünvanı *', ['unvan', 'firmaadi', 'firmaunvani', 'firma', 'sirket', 'sirketadi', 'musteriadi', 'musteriunvani', 'ticariunvan', 'isyeri', 'isyeriadi', 'kurum']],
-  ['dis_no', 'Müşteri / dış kayıt no', ['disno', 'musterino', 'firmano', 'carikod', 'cari', 'ncst', 'vergino', 'vkn', 'kayitno', 'kod']],
+  ['dis_no', 'Müşteri no (boşsa otomatik verilir)', ['disno', 'musterino', 'firmano', 'carikod', 'cari', 'ncst', 'vergino', 'vkn', 'kayitno', 'kod']],
   ['sektor', 'Sektör', ['sektor', 'faaliyet', 'faaliyetalani', 'nace']],
   ['il', 'İl', ['il', 'sehir']],
   ['ilce', 'İlçe', ['ilce']],

@@ -108,6 +108,14 @@ export function musteriRotalari(app) {
       });
     });
 
+    // Musteri numarasi bos olanlara otomatik numara ver: M000001, M000002 ... (firma basina, es zamanli yuklemelere karsi kilitli)
+    if (m.dis.some((d) => d === null)) {
+      await q(`SELECT pg_advisory_xact_lock(hashtext($1))`, ['musteri_no:' + kod]);
+      const mx = await q(`SELECT COALESCE(max(substring(dis_no from 2)::int), 0) AS n FROM ${T(kod, 'musteriler')} WHERE dis_no ~ '^M[0-9]{1,9}$'`);
+      let sayac = mx.rows[0].n;
+      m.dis = m.dis.map((d) => (d === null ? 'M' + String(++sayac).padStart(6, '0') : d));
+    }
+
     let eklenenIds = [];
     if (m.id.length) {
       const r = await q(
