@@ -180,7 +180,7 @@ function sayfaYukleme() {
       const al = (k2) => (m[k2] >= 0 ? s[m[k2]] : '');
       const ad = baslikSade(al('unvan'));
       const dis = String(al('dis_no') == null ? '' : al('dis_no')).trim();
-      const anahtar = dis ? 'd:' + dis : (ad ? 'u:' + ad : 'r:' + i);
+      const anahtar = ad ? 'u:' + ad : (dis ? 'd:' + dis : 'r:' + i);
       let g = grup.get(anahtar);
       if (!g) { g = { no: i + 2, kontaklar: [], _gor: {} }; grup.set(anahtar, g); sirali.push(g); }
       FIRMA_ALANLARI.forEach((k2) => { if (m[k2] >= 0 && !bosDegil(g[k2]) && bosDegil(al(k2))) g[k2] = al(k2); });
@@ -229,7 +229,7 @@ function sayfaYukleme() {
       gecerli.push(o); kSay += kn;
     });
     if (gecerli.length) parcalar.push(gecerli);
-    let eklenen = 0; let mukerrer = 0; let bos = 0; let kontak = 0; let islenen = 0; const hatalar = [];
+    let eklenen = 0; let mukerrer = 0; let birlesen = 0; let bos = 0; let kontak = 0; let islenen = 0; const hatalar = [];
     for (let i = 0; i < parcalar.length; i++) {
       mesaj(kutu, 'basari', 'Yükleniyor… ' + islenen + ' / ' + satirNesne.length);
       const s = await api('/api/yuklemeler/' + bas.j.id + '/satirlar', { satirlar: parcalar[i] });
@@ -240,12 +240,13 @@ function sayfaYukleme() {
         gecmisYukle();
         return;
       }
-      eklenen += s.j.eklenen; mukerrer += s.j.mukerrer; bos += s.j.bos; kontak += (s.j.kontak || 0);
+      eklenen += s.j.eklenen; mukerrer += s.j.mukerrer; birlesen += (s.j.birlesen || 0); bos += s.j.bos; kontak += (s.j.kontak || 0);
       (s.j.hatalar || []).forEach((h) => { if (hatalar.length < 20) hatalar.push(h); });
     }
     sihirbaz.innerHTML = '';
     const liste = el('ul', { style: 'margin:8px 0 0;padding-left:18px;line-height:1.7' }, [
       el('li', { metin: 'Eklenen müşteri: ' + eklenen + (kontak ? ' · eklenen yetkili: ' + kontak : '') }),
+      el('li', { metin: 'Aynı ünvanlı kayıtlara birleştirilen satır (yetkilileri mevcut müşteriye eklendi): ' + birlesen }),
       el('li', { metin: 'Mükerrer (aynı müşteri no zaten var) atlanan: ' + mukerrer }),
       el('li', { metin: 'Ünvanı boş olduğu için atlanan: ' + bos }),
     ]);
@@ -312,6 +313,19 @@ function sayfaMusteriler() {
   const filtre = el('div');
   const liste = el('div');
   const detay = el('div');
+  if (eylemVar('musteri_duzenle')) {
+    const bk = el('div'); icerik.appendChild(bk);
+    api('/api/mukerrer-ozet').then((o) => {
+      if (!o.ok || !o.j.grup) return;
+      const mk = el('div', { style: 'display:none' });
+      bk.appendChild(panel([el('p', { metin: o.j.grup + ' ünvanda toplam ' + o.j.fazla_kayit + ' mükerrer müşteri kaydı var. Birleştirilince yetkililer tek müşteride toplanır; arama geçmişi olan kayıtlara dokunulmaz.' }),
+        el('div', { 'class': 'satir' }, [el('button', { type: 'button', metin: 'Mükerrer müşterileri birleştir', onclick: (e) => {
+          if (!confirm('Aynı ünvanlı müşteriler tek kayıtta birleştirilsin mi?')) return;
+          e.target.disabled = true;
+          api('/api/mukerrer-birlestir', {}).then((r) => { if (r.ok) { mesaj(mk, 'basari', r.j.birlesen + ' kayıt birleştirildi, ' + r.j.kontak + ' yetkili taşındı' + (r.j.atlanan ? ', ' + r.j.atlanan + ' kayıt arama geçmişi olduğu için atlandı' : '') + '.'); setTimeout(() => yonlendir(), 1500); } else { e.target.disabled = false; mesaj(mk, 'hata', hataMetni(r)); } });
+        } })]), mk]));
+    });
+  }
   icerik.appendChild(filtre);
   icerik.appendChild(detay);
   icerik.appendChild(liste);

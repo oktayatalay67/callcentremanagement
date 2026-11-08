@@ -17,6 +17,7 @@ import { girisSayfasi, kurulumSayfasi } from './sayfalar.js';
 import { APP_JS, KURULUM_JS, XLSX_JS } from './istemci.gen.js';
 import { yonetimRotalari } from './yonetim.js';
 import { musteriRotalari } from './musteri.js';
+import { aramaRotalari } from './arama.js';
 import {
   SURUM, COOKIE, FIRMA_KOD_RE, KULLANICI_RE, norm, hata, jsonGovde, istemciIp, tekrarSayisi,
   oturumAnahtari, oturumAl, oturumBaslat,
@@ -140,6 +141,7 @@ export function uygulamaOlustur() {
   // ---- Firma yonetim API'si (profil, kullanicilar, roller, sifre, /api/ben) ----
   yonetimRotalari(app);
   musteriRotalari(app);
+  aramaRotalari(app);
 
   // ---- Kurulum (kurulum anahtari ile korunur) ----
   app.post('/api/kurulum/platform-admin', async (c) => {

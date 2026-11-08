@@ -41,6 +41,22 @@ a{color:var(--ana)}
 .menu a:hover{background:color-mix(in srgb, var(--ana) 9%, #fff)}
 .menu a.aktif{background:var(--ana);color:#fff}
 .icerik{flex:1;padding:24px;min-width:0}
+.kutular{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;max-width:960px}
+.kutu{flex:1;min-width:120px;background:#fff;color:#1c2430;border:2px solid #dde3ea;border-radius:10px;padding:12px;font-weight:600}
+.kutu.aktif{border-color:var(--ana);background:color-mix(in srgb, var(--ana) 9%, #fff)}.kutu .sayi{font-size:26px;font-weight:700;color:var(--ana)}
+.kayit{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #dde3ea;border-radius:10px;padding:12px 14px;margin-bottom:8px;max-width:960px}
+.kayit.yasak{border-color:#b42318;background:#fdf3f2}
+.bant{margin-top:6px;padding:4px 8px;background:#b42318;color:#fff;border-radius:6px;font-size:12px;font-weight:600;display:inline-block}
+.modal-arka{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px;z-index:50}
+.modal{background:#fff;border-radius:12px;padding:20px;width:100%;max-width:760px}
+.telkutu{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0;padding:12px;background:#f4f6f9;border-radius:8px}
+.dugme-link{display:inline-block;padding:8px 14px;background:var(--ana);color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px}
+.soru{margin:14px 0;padding:12px;border:1px solid #dde3ea;border-radius:8px}
+.secenekler{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+button.sec{background:#fff;color:#1c2430;border:1px solid #c5ced9}button.sec.aktif{background:var(--ana);color:#fff;border-color:var(--ana)}
+.metin{white-space:pre-wrap;background:#f9fafb;border:1px solid #e5e9ef;border-radius:6px;padding:10px;margin:6px 0;font-size:14px}
+label.onay{display:inline-flex;align-items:center;gap:4px;font-weight:400;margin-right:12px}
+.icerik-kutu{border:1px solid #e5e9ef;border-radius:8px;padding:10px;margin:8px 0}
 .panel{background:#fff;border:1px solid #dde3ea;border-radius:10px;padding:20px;margin-bottom:18px;max-width:960px}
 .izgara{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
 .satir{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}

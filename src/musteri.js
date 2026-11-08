@@ -21,6 +21,12 @@ const kisalt = (v, n) => {
   return s ? s.slice(0, n) : null;
 };
 
+// Unvan anahtari: buyuk/kucuk harf, Turkce harf ve bosluk farklarini yok sayar (SQL ile ayni mantik).
+export function unvanAnahtar(v) {
+  return String(v || '').trim().replace(/[İIıŞşĞğÜüÖöÇç]/g, (ch) => 'iiissgguuoocc'['İIıŞşĞğÜüÖöÇç'.indexOf(ch)]).toLowerCase().replace(/\s+/g, ' ');
+}
+const ANAHTAR_SQL = (kol) => `regexp_replace(lower(translate(btrim(${kol}), 'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc')), '\\s+', ' ', 'g')`;
+
 // Telefon: yalniz rakam; basta 90 / 0 atilir; 10 hane ise bu biciminde saklanir, degilse ham rakamlar.
 export function telefonNorm(v) {
   const ham = kisalt(v, 40);
@@ -71,7 +77,7 @@ export function musteriRotalari(app) {
       throw new HttpHata(400, 'Bildirilen satır sayısı aşıldı.');
     }
 
-    const m = { id: [], dis: [], unvan: [], sektor: [], il: [], ilce: [], adres: [], tel: [], ep: [], web: [], ek: [] };
+    const m = { key: [], id: [], dis: [], unvan: [], sektor: [], il: [], ilce: [], adres: [], tel: [], ep: [], web: [], ek: [] };
     const kont = [];   // { musteriId, ad, gorev, tel, ep }
     const hatalar = [];
     let atlananBos = 0;
@@ -88,7 +94,7 @@ export function musteriRotalari(app) {
         });
       }
       const mid = crypto.randomUUID();
-      m.id.push(mid); m.dis.push(kisalt(s.dis_no, 60)); m.unvan.push(unvan);
+      m.key.push(unvanAnahtar(unvan)); m.id.push(mid); m.dis.push(kisalt(s.dis_no, 60)); m.unvan.push(unvan);
       m.sektor.push(kisalt(s.sektor, 100)); m.il.push(kisalt(s.il, 60)); m.ilce.push(kisalt(s.ilce, 60));
       m.adres.push(kisalt(s.adres, 500)); m.tel.push(telefonNorm(s.telefon));
       m.ep.push(kisalt(s.eposta, 200)); m.web.push(kisalt(s.web, 200)); m.ek.push(JSON.stringify(ek));
@@ -108,16 +114,37 @@ export function musteriRotalari(app) {
       });
     });
 
+    // ---- MUKERRER ONLEME: ayni unvan = ayni musteri; yetkililer tek musteride toplanir ----
+    // 1) Ayni parca icinde ayni unvanli satirlari ilkine bagla
+    const ilkIdx = new Map(); const yonlendir = new Map(); const tut = [];
+    m.key.forEach((kx, i) => {
+      if (ilkIdx.has(kx)) { yonlendir.set(m.id[i], m.id[ilkIdx.get(kx)]); } else { ilkIdx.set(kx, i); tut.push(i); }
+    });
+    kont.forEach((x) => { if (yonlendir.has(x.mid)) x.mid = yonlendir.get(x.mid); });
+    // 2) Veritabaninda ayni unvanli (silinmemis) musteri varsa yeni kayit acma, yetkilileri ona ekle
+    const mevcut = new Map();
+    if (tut.length) {
+      const ex = await q(`SELECT id, ${ANAHTAR_SQL('unvan')} AS anahtar FROM ${T(kod, 'musteriler')}
+                           WHERE NOT silindi AND ${ANAHTAR_SQL('unvan')} = ANY($1::text[]) ORDER BY olusturma`, [tut.map((i) => m.key[i])]);
+      ex.rows.forEach((x) => { if (!mevcut.has(x.anahtar)) mevcut.set(x.anahtar, x.id); });
+    }
+    const birlesenSayi = (m.id.length - tut.length) + tut.filter((i) => mevcut.has(m.key[i])).length;
+    tut.forEach((i) => { if (mevcut.has(m.key[i])) yonlendir.set(m.id[i], mevcut.get(m.key[i])); });
+    kont.forEach((x) => { if (yonlendir.has(x.mid)) x.mid = yonlendir.get(x.mid); });
+    const yeniIdx = tut.filter((i) => !mevcut.has(m.key[i]));
+    const sec = (dz) => yeniIdx.map((i) => dz[i]);
+    const y2 = { id: sec(m.id), dis: sec(m.dis), unvan: sec(m.unvan), sektor: sec(m.sektor), il: sec(m.il), ilce: sec(m.ilce), adres: sec(m.adres), tel: sec(m.tel), ep: sec(m.ep), web: sec(m.web), ek: sec(m.ek) };
+
     // Musteri numarasi bos olanlara otomatik numara ver: M000001, M000002 ... (firma basina, es zamanli yuklemelere karsi kilitli)
-    if (m.dis.some((d) => d === null)) {
+    if (y2.dis.some((d) => d === null)) {
       await q(`SELECT pg_advisory_xact_lock(hashtext($1))`, ['musteri_no:' + kod]);
       const mx = await q(`SELECT COALESCE(max(substring(dis_no from 2)::int), 0) AS n FROM ${T(kod, 'musteriler')} WHERE dis_no ~ '^M[0-9]{1,9}$'`);
       let sayac = mx.rows[0].n;
-      m.dis = m.dis.map((d) => (d === null ? 'M' + String(++sayac).padStart(6, '0') : d));
+      y2.dis = y2.dis.map((d) => (d === null ? 'M' + String(++sayac).padStart(6, '0') : d));
     }
 
     let eklenenIds = [];
-    if (m.id.length) {
+    if (y2.id.length) {
       const r = await q(
         `INSERT INTO ${T(kod, 'musteriler')} (id, dis_no, unvan, sektor, il, ilce, adres, telefon, eposta, web, ek_alanlar, yukleme_id)
          SELECT t.id, t.dis, t.unvan, t.sektor, t.il, t.ilce, t.adres, t.tel, t.ep, t.web, t.ek::jsonb, $12
@@ -125,11 +152,21 @@ export function musteriRotalari(app) {
                 AS t(id, dis, unvan, sektor, il, ilce, adres, tel, ep, web, ek)
          ON CONFLICT DO NOTHING
          RETURNING id`,
-        [m.id, m.dis, m.unvan, m.sektor, m.il, m.ilce, m.adres, m.tel, m.ep, m.web, m.ek, id]);
+        [y2.id, y2.dis, y2.unvan, y2.sektor, y2.il, y2.ilce, y2.adres, y2.tel, y2.ep, y2.web, y2.ek, id]);
       eklenenIds = r.rows.map((x) => x.id);
     }
     const eklenenKume = new Set(eklenenIds);
-    const kk = kont.filter((x) => eklenenKume.has(x.mid));
+    const mevcutKume = new Set(mevcut.values());
+    const noConflict = y2.id.length - eklenenIds.length;   // musteri no cakismasi ile atlananlar
+    // Yetkililer: yeni musterilere veya mevcut musterilere eklenir; ayni ad (veya telefon) zaten varsa eklenmez
+    let kk = kont.filter((x) => eklenenKume.has(x.mid) || mevcutKume.has(x.mid));
+    const gorulen = new Set();
+    kk = kk.filter((x) => { const a = x.mid + '|' + (x.ad || '').toLocaleLowerCase('tr'); if (gorulen.has(a)) return false; gorulen.add(a); return true; });
+    if (mevcutKume.size && kk.length) {
+      const var2 = await q(`SELECT musteri_id, lower(ad_soyad) AS ad FROM ${T(kod, 'kontaklar')} WHERE musteri_id = ANY($1::uuid[]) AND NOT silindi`, [[...mevcutKume]]);
+      const vs = new Set(var2.rows.map((x) => x.musteri_id + '|' + x.ad));
+      kk = kk.filter((x) => !vs.has(x.mid + '|' + (x.ad || '').toLowerCase()));
+    }
     if (kk.length) {
       await q(
         `INSERT INTO ${T(kod, 'kontaklar')} (musteri_id, ad_soyad, gorev, telefon, telefon2, eposta)
@@ -137,10 +174,60 @@ export function musteriRotalari(app) {
         [kk.map((x) => x.mid), kk.map((x) => x.ad), kk.map((x) => x.gorev), kk.map((x) => x.tel), kk.map((x) => x.tel2), kk.map((x) => x.ep)]);
     }
     const eklenen = eklenenIds.length;
-    const mukerrer = m.id.length - eklenen;
-    const atlanan = mukerrer + atlananBos;
+    const mukerrer = noConflict;
+    const atlanan = mukerrer + birlesenSayi + atlananBos;
     await q(`UPDATE ${T(kod, 'yuklemeler')} SET eklenen = eklenen + $2, atlanan = atlanan + $3 WHERE id = $1`, [id, eklenen, atlanan]);
-    return { durum: 'ok', eklenen, mukerrer, bos: atlananBos, kontak: kk.length, hatalar };
+    return { durum: 'ok', eklenen, mukerrer, birlesen: birlesenSayi, bos: atlananBos, kontak: kk.length, hatalar };
+  }));
+
+  // ---- Mevcut mukerrer musterileri (ayni unvan) tek kayitta birlestir ----
+  async function mukerrerGruplar(q, kod) {
+    const r = await q(
+      `SELECT m.id, m.olusturma, ${ANAHTAR_SQL('m.unvan')} AS anahtar,
+              (SELECT count(*)::int FROM ${T(kod, 'aramalar')} a WHERE a.musteri_id = m.id) AS arama,
+              (SELECT count(*)::int FROM ${T(kod, 'kontaklar')} k WHERE k.musteri_id = m.id AND NOT k.silindi) AS kontak
+         FROM ${T(kod, 'musteriler')} m WHERE NOT m.silindi ORDER BY m.olusturma, m.id`);
+    const g = new Map();
+    r.rows.forEach((x) => { if (!g.has(x.anahtar)) g.set(x.anahtar, []); g.get(x.anahtar).push(x); });
+    return [...g.values()].filter((a) => a.length > 1);
+  }
+  app.get('/api/mukerrer-ozet', (c) => firmaIslemi(c, { izin: 'musteri_duzenle' }, async ({ q, kod }) => {
+    const gr = await mukerrerGruplar(q, kod);
+    return { durum: 'ok', grup: gr.length, fazla_kayit: gr.reduce((t, a) => t + a.length - 1, 0) };
+  }));
+  app.post('/api/mukerrer-birlestir', (c) => firmaIslemi(c, { izin: 'musteri_duzenle', islemli: true }, async ({ q, k, kod }) => {
+    await q(`SELECT pg_advisory_xact_lock(hashtext($1))`, ['musteri_no:' + kod]);
+    const gr = await mukerrerGruplar(q, kod);
+    let birlesen = 0; let atlanan = 0; let tasinanKontak = 0;
+    for (const a of gr) {
+      // Ana kayit: en cok arama gecmisi olan, sonra en eski
+      const sirali = [...a].sort((x, y) => (y.arama - x.arama) || (new Date(x.olusturma) - new Date(y.olusturma)));
+      const ana = sirali[0].id;
+      for (const d of sirali.slice(1)) {
+        if (d.arama > 0) { atlanan++; continue; }   // arama gecmisi degismez; bu kayit elle kalir
+        const mk = await q(`SELECT lower(ad_soyad) AS ad FROM ${T(kod, 'kontaklar')} WHERE musteri_id = $1 AND NOT silindi`, [ana]);
+        const var2 = new Set(mk.rows.map((x) => x.ad));
+        const dk = await q(`SELECT id, lower(ad_soyad) AS ad FROM ${T(kod, 'kontaklar')} WHERE musteri_id = $1 AND NOT silindi ORDER BY olusturma`, [d.id]);
+        const tasi = []; const sil = [];
+        dk.rows.forEach((x) => { if (var2.has(x.ad)) sil.push(x.id); else { var2.add(x.ad); tasi.push(x.id); } });
+        if (tasi.length) { await q(`UPDATE ${T(kod, 'kontaklar')} SET musteri_id = $1 WHERE id = ANY($2::uuid[])`, [ana, tasi]); tasinanKontak += tasi.length; }
+        if (sil.length) await q(`UPDATE ${T(kod, 'kontaklar')} SET silindi = true WHERE id = ANY($1::uuid[])`, [sil]);
+        // Liste kayitlari: ana kayitta ayni liste yoksa tasi, varsa sil
+        await q(`UPDATE ${T(kod, 'liste_kayitlari')} lk SET musteri_id = $1 WHERE lk.musteri_id = $2
+                  AND NOT EXISTS (SELECT 1 FROM ${T(kod, 'liste_kayitlari')} y WHERE y.musteri_id = $1 AND y.liste_id = lk.liste_id)`, [ana, d.id]);
+        await q(`DELETE FROM ${T(kod, 'liste_kayitlari')} WHERE musteri_id = $1`, [d.id]);
+        // Atama: ana kayitta yoksa tasi
+        await q(`UPDATE ${T(kod, 'atamalar')} at1 SET musteri_id = $1 WHERE at1.musteri_id = $2
+                  AND NOT EXISTS (SELECT 1 FROM ${T(kod, 'atamalar')} y WHERE y.musteri_id = $1 AND y.kullanici_id = at1.kullanici_id)`, [ana, d.id]);
+        await q(`DELETE FROM ${T(kod, 'atamalar')} WHERE musteri_id = $1`, [d.id]);
+        await q(`UPDATE ${T(kod, 'takvim')} SET musteri_id = $1 WHERE musteri_id = $2`, [ana, d.id]);
+        await q(`UPDATE ${T(kod, 'yasakli_liste')} SET musteri_id = $1 WHERE musteri_id = $2 AND kapsam = 'musteri'`, [ana, d.id]);
+        await q(`UPDATE ${T(kod, 'musteriler')} SET silindi = true, silinme_zamani = now() WHERE id = $1`, [d.id]);
+        birlesen++;
+      }
+    }
+    await gunluk(q, kod, k.id, 'mukerrer_birlestir', 'musteri', null, { birlesen, atlanan, tasinanKontak });
+    return { durum: 'ok', birlesen, atlanan, kontak: tasinanKontak };
   }));
 
   // ---- Yukleme gecmisi ----

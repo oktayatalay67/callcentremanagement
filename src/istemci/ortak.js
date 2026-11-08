@@ -48,7 +48,7 @@ function deger(ad) { return document.getElementById('f_' + ad).value; }
 
 function api(yol, govde, yontem, basliklar) {
   const secenek = { method: yontem || (govde ? 'POST' : 'GET'), credentials: 'same-origin', headers: {} };
-  if (govde) { secenek.headers['Content-Type'] = 'application/json'; secenek.body = JSON.stringify(govde); }
+  if (govde || secenek.method !== 'GET') { secenek.headers['Content-Type'] = 'application/json'; secenek.body = JSON.stringify(govde || {}); }
   if (basliklar) { for (const k in basliklar) secenek.headers[k] = basliklar[k]; }
   return fetch(yol, secenek).then((r) =>
     r.json().catch(() => null).then((j) => {

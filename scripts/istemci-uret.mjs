@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 const surum = JSON.parse(readFileSync('package.json', 'utf8')).version;
 const oku = (ad) => readFileSync('src/istemci/' + ad, 'utf8').replace(/__SURUM__/g, surum);
-const app = oku('ortak.js') + '\n' + oku('uygulama.js') + '\n' + oku('musteri.js');
+const app = oku('ortak.js') + '\n' + oku('uygulama.js') + '\n' + oku('musteri.js') + '\n' + oku('arama.js');
 const kurulum = oku('ortak.js') + '\n' + oku('kurulum.js');
 writeFileSync('src/istemci.gen.js',
   '// OTOMATIK URETILDI (npm run istemci) - elle DEGISTIRME. Kaynak: src/istemci/*.js\n' +

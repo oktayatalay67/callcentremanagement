@@ -19,6 +19,14 @@ function musteriKapsami() {
 function yoneticiMi() {
   return !!ben && (ben.platform || ['kullanici_yonet', 'rol_yonet', 'firma_profil_duzenle', 'excel_yukle', 'atama_yap', 'liste_yonet', 'ayar_yonet', 'rapor_gor', 'dashboard_gor'].some(eylemVar));
 }
+function aramaKapsami() {
+  const k = ben && !ben.platform && ben.izinler && ben.izinler.kapsam && ben.izinler.kapsam.arama;
+  return (k === 'TUM' || k === 'KENDI') && eylemVar('arama_yap');
+}
+function takvimKapsami() {
+  const k = ben && !ben.platform && ben.izinler && ben.izinler.kapsam && ben.izinler.kapsam.takvim;
+  return k === 'TUM' || k === 'KENDI';
+}
 function sifreIzni() { return !!ben && (ben.platform || eylemVar('sifre_degistir')); }
 function eylemVar(ad) { return !!ben && ben.izinler.eylem.indexOf(ad) >= 0; }
 
@@ -70,11 +78,15 @@ function kabuk() {
   const ogeler = [];
   if (yoneticiMi()) ogeler.push(['#/ana', 'Ana sayfa']);
   if (!ben.platform && eylemVar('firma_profil_duzenle')) ogeler.push(['#/profil', 'Firma profili']);
-  if (musteriKapsami()) ogeler.push(['#/musteriler', ben.izinler.kapsam.musteri === 'KENDI' ? 'Aranacak müşterilerim' : 'Müşteriler']);
+  if (aramaKapsami()) ogeler.push(['#/arama', 'Arama ekranı']);
+  if (eylemVar('liste_yonet')) ogeler.push(['#/listeler', 'Arama listeleri']);
+  if (takvimKapsami()) ogeler.push(['#/takvim', 'Takvim']);
+  if (musteriKapsami() && !(aramaKapsami() && ben.izinler.kapsam.musteri === 'KENDI')) ogeler.push(['#/musteriler', ben.izinler.kapsam.musteri === 'KENDI' ? 'Aranacak müşterilerim' : 'Müşteriler']);
   if (eylemVar('excel_yukle')) ogeler.push(['#/yukleme', 'Excel yükleme']);
   if (eylemVar('kullanici_yonet')) ogeler.push(['#/kullanicilar', 'Kullanıcılar']);
   if (eylemVar('kullanici_yonet')) ogeler.push(['#/girisler', 'Giriş kayıtları']);
   if (eylemVar('rol_yonet')) ogeler.push(['#/roller', 'Roller ve izinler']);
+  if (eylemVar('ayar_yonet')) ogeler.push(['#/ayarlar', 'Arama ayarları']);
   const menu = el('nav', { 'class': 'menu' }, ogeler.map((o) => el('a', { href: o[0], 'data-yol': o[0], metin: o[1] })));
   if (ben.platform) {
     menu.appendChild(el('a', { href: '/kurulum', metin: 'Firma kurulumu' }));
@@ -93,8 +105,9 @@ function yonlendir() {
     '#/ana': yoneticiMi(), '#/sifre': sifreIzni(), '#/profil': !ben.platform && eylemVar('firma_profil_duzenle'),
     '#/kullanicilar': eylemVar('kullanici_yonet'), '#/girisler': eylemVar('kullanici_yonet'), '#/roller': eylemVar('rol_yonet'),
     '#/musteriler': musteriKapsami(), '#/yukleme': eylemVar('excel_yukle'),
+    '#/arama': aramaKapsami(), '#/listeler': eylemVar('liste_yonet'), '#/ayarlar': eylemVar('ayar_yonet'), '#/takvim': takvimKapsami(),
   };
-  if (!izinli[yol]) yol = yoneticiMi() ? '#/ana' : (musteriKapsami() ? '#/musteriler' : '#/sifre');
+  if (!izinli[yol]) yol = yoneticiMi() ? '#/ana' : (aramaKapsami() ? '#/arama' : (musteriKapsami() ? '#/musteriler' : '#/sifre'));
   document.querySelectorAll('.menu a[data-yol]').forEach((a) => {
     a.className = a.getAttribute('data-yol') === yol ? 'aktif' : '';
   });
@@ -105,6 +118,10 @@ function yonlendir() {
   else if (yol === '#/girisler') sayfaGirisler();
   else if (yol === '#/musteriler') sayfaMusteriler();
   else if (yol === '#/yukleme') sayfaYukleme();
+  else if (yol === '#/arama') sayfaArama();
+  else if (yol === '#/listeler') sayfaListeler();
+  else if (yol === '#/ayarlar') sayfaAyarlar();
+  else if (yol === '#/takvim') sayfaTakvim();
   else if (yol === '#/sifre') sayfaSifre();
   else sayfaAna();
 }
@@ -124,6 +141,8 @@ function baslik(metin, sag) {
 
 // ---------------- Surum notlari (her yayinda en uste eklenir) ----------------
 const SURUM_NOTLARI = [
+  ['0.8.1', 'Aynı ünvanlı müşteriler tek kayıtta toplanır (yüklemede otomatik); mevcut mükerrer kayıtlar için "Mükerrer müşterileri birleştir" düğmesi.'],
+  ['0.8.0', 'Arama modülü: arama listeleri ve agent dağıtımı, agent arama ekranı (Yeni / Tekrar / Ulaşılamayan / Tamamlanan), SSSO arama akışı, takvim, arama ayarları.'],
   ['0.7.3', 'Agent ekranı sadece aranacak müşterileri gösterir; "Kendi şifresini değiştir" izni rol bazında yönetilir.'],
   ['0.7.2', 'Müşteri numarası boş bırakılırsa otomatik verilir (M000001, M000002 ...).'],
   ['0.7.1', 'Excel yükleme: aynı firmanın satırları tek müşteride birleştirilir (yetkili listesi), küçük parçalarla yükleme, daha açıklayıcı hata.'],
