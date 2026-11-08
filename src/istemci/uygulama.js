@@ -11,6 +11,10 @@ function temaUygula(r) {
 
 window.oturumDustu = function () { if (ben) { ben = null; girisEkrani(); } };
 
+function musteriKapsami() {
+  const k = ben && !ben.platform && ben.izinler && ben.izinler.kapsam && ben.izinler.kapsam.musteri;
+  return k === 'TUM' || k === 'KENDI';
+}
 function eylemVar(ad) { return !!ben && ben.izinler.eylem.indexOf(ad) >= 0; }
 
 // ---------------- Giris ----------------
@@ -59,6 +63,8 @@ function kabuk() {
   ]);
   const ogeler = [['#/ana', 'Ana sayfa']];
   if (!ben.platform) ogeler.push(['#/profil', 'Firma profili']);
+  if (musteriKapsami()) ogeler.push(['#/musteriler', 'Müşteriler']);
+  if (eylemVar('excel_yukle')) ogeler.push(['#/yukleme', 'Excel yükleme']);
   if (eylemVar('kullanici_yonet')) ogeler.push(['#/kullanicilar', 'Kullanıcılar']);
   if (eylemVar('rol_yonet')) ogeler.push(['#/roller', 'Roller ve izinler']);
   const menu = el('nav', { 'class': 'menu' }, ogeler.map((o) => el('a', { href: o[0], 'data-yol': o[0], metin: o[1] })));
@@ -78,6 +84,7 @@ function yonlendir() {
   const izinli = {
     '#/ana': true, '#/sifre': true, '#/profil': !ben.platform,
     '#/kullanicilar': eylemVar('kullanici_yonet'), '#/roller': eylemVar('rol_yonet'),
+    '#/musteriler': musteriKapsami(), '#/yukleme': eylemVar('excel_yukle'),
   };
   if (!izinli[yol]) yol = '#/ana';
   document.querySelectorAll('.menu a[data-yol]').forEach((a) => {
@@ -87,6 +94,8 @@ function yonlendir() {
   if (yol === '#/profil') sayfaProfil();
   else if (yol === '#/kullanicilar') sayfaKullanicilar();
   else if (yol === '#/roller') sayfaRoller();
+  else if (yol === '#/musteriler') sayfaMusteriler();
+  else if (yol === '#/yukleme') sayfaYukleme();
   else if (yol === '#/sifre') sayfaSifre();
   else sayfaAna();
 }
@@ -117,7 +126,7 @@ function sayfaAna() {
     el('h2', { metin: 'Hoş geldiniz, ' + (ben.ad_soyad || ben.kullanici_adi) }),
     el('p', { 'class': 'alt', metin: ben.platform ? 'Platform yönetimi' : ben.firma_unvan + ' (' + ben.firma_kod + ')' }),
     el('p', { metin: 'Kullanabileceğiniz ekranlar:' }), liste,
-    el('p', { 'class': 'alt', style: 'margin-top:16px', metin: 'Müşteri listesi, arama ekranı ve raporlar sonraki sürümlerde eklenecek.' }),
+    el('p', { 'class': 'alt', style: 'margin-top:16px', metin: 'Atama, arama ekranı ve raporlar sonraki sürümlerde eklenecek.' }),
   ]));
 }
 

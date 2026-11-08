@@ -14,8 +14,9 @@ import { deleteCookie } from 'hono/cookie';
 import { veritabani } from './db.js';
 import { sifreOzeti, sifreDogrula, SAHTE_OZET, anahtarEsitMi } from './guvenlik.js';
 import { girisSayfasi, kurulumSayfasi } from './sayfalar.js';
-import { APP_JS, KURULUM_JS } from './istemci.gen.js';
+import { APP_JS, KURULUM_JS, XLSX_JS } from './istemci.gen.js';
 import { yonetimRotalari } from './yonetim.js';
+import { musteriRotalari } from './musteri.js';
 import {
   SURUM, COOKIE, FIRMA_KOD_RE, KULLANICI_RE, norm, hata, jsonGovde, istemciIp, tekrarSayisi,
   oturumAnahtari, oturumAl, oturumBaslat,
@@ -72,6 +73,7 @@ export function uygulamaOlustur() {
   app.get('/', (c) => c.html(girisSayfasi()));
   app.get('/kurulum', (c) => c.html(kurulumSayfasi()));
   app.get('/app.js', (c) => c.body(APP_JS, 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
+  app.get('/xlsx.js', (c) => c.body(XLSX_JS, 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
   app.get('/kurulum.js', (c) => c.body(KURULUM_JS, 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
 
   // ---- Giris ----
@@ -137,6 +139,7 @@ export function uygulamaOlustur() {
 
   // ---- Firma yonetim API'si (profil, kullanicilar, roller, sifre, /api/ben) ----
   yonetimRotalari(app);
+  musteriRotalari(app);
 
   // ---- Kurulum (kurulum anahtari ile korunur) ----
   app.post('/api/kurulum/platform-admin', async (c) => {

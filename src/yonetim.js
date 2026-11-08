@@ -20,7 +20,7 @@ const LOGO_MAX = 204800;
 const LOGO_TIPLERI = { 'image/png': [0x89, 0x50, 0x4e, 0x47], 'image/jpeg': [0xff, 0xd8, 0xff] };
 const EPOSTA_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function pgHatasi(e) {
+export function pgHatasi(e) {
   if (e instanceof HttpHata) return e;
   if (e && e.code === '23505') return new HttpHata(409, 'Bu kayıt zaten var.');
   if (e && e.code === '23503') return new HttpHata(400, 'Geçersiz başvuru (ör. seçilen yönetici bu firmada yok).');
@@ -31,7 +31,7 @@ function pgHatasi(e) {
 
 // Firma kullanicisi icin korumali islem: oturum + (istege bagli) izin + (istege bagli) islem.
 // fn duz nesne dondururse JSON, Response dondururse aynen gider.
-async function firmaIslemi(c, { izin = null, islemli = false }, fn) {
+export async function firmaIslemi(c, { izin = null, islemli = false }, fn) {
   const k = await oturumAl(c);
   if (!k) return hata(c, 401, 'Oturum yok.');
   if (!k.firma_id) return hata(c, 403, 'Bu işlem yalnızca firma kullanıcıları içindir.');
@@ -51,13 +51,13 @@ async function firmaIslemi(c, { izin = null, islemli = false }, fn) {
   }
 }
 
-async function gunluk(q, kod, kullaniciId, islem, nesne, nesneId, detay) {
+export async function gunluk(q, kod, kullaniciId, islem, nesne, nesneId, detay) {
   await q(`INSERT INTO ${T(kod, 'islem_gunlugu')} (kullanici_id, islem, nesne, nesne_id, detay)
            VALUES ($1, $2, $3, $4, $5::jsonb)`,
     [kullaniciId, islem, nesne, nesneId ? String(nesneId) : null, JSON.stringify(detay || {})]);
 }
 
-function idAl(c) {
+export function idAl(c) {
   const id = c.req.param('id');
   if (!UUID_RE.test(id)) throw new HttpHata(400, 'Geçersiz kimlik.');
   return id;
