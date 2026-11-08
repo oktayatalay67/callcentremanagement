@@ -1,6 +1,6 @@
 {
   "name": "cc-platform",
-  "version": "0.7.1",
+  "version": "0.7.3",
   "private": true,
   "type": "module",
   "description": "Cok firmali cold-call platformu - Adim 5.1: firma renkleri",

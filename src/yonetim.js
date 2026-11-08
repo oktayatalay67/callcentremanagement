@@ -9,7 +9,7 @@ import { Buffer } from 'node:buffer';
 import { veritabani } from './db.js';
 import { sifreOzeti, sifreDogrula } from './guvenlik.js';
 import {
-  KATALOG, KAPSAM_DEGERLERI, KAPSAM_ANAHTARLARI, EYLEM_ANAHTARLARI, izinleriYukle,
+  KATALOG, KAPSAM_DEGERLERI, KAPSAM_ANAHTARLARI, EYLEM_ANAHTARLARI, VARSAYILAN_ACIK, izinleriYukle,
 } from './izinler.js';
 import {
   T, HttpHata, hata, jsonGovde, norm, metin, oturumAl, oturumBaslat, tekrarSayisi,
@@ -102,6 +102,10 @@ export function yonetimRotalari(app) {
     const db = veritabani(c.env.DATABASE_URL);
     const ozet = await sifreOzeti(yeni, tekrarSayisi(c));
     const sonuc = await db.islem(async (q) => {
+      if (k.firma_id) {
+        const iz = await izinleriYukle(q, k.firma_kod, k.rol_kod);
+        if (!iz.eylem.has('sifre_degistir')) return { yasak: true };
+      }
       const r = await q(`SELECT sifre_ozeti FROM cc.kullanicilar WHERE id = $1 FOR UPDATE`, [k.id]);
       if (!(await sifreDogrula(eski, r.rows[0].sifre_ozeti))) return { yanlis: true };
       const u = await q(`UPDATE cc.kullanicilar SET sifre_ozeti = $2, oturum_surumu = oturum_surumu + 1
@@ -109,6 +113,7 @@ export function yonetimRotalari(app) {
       if (k.firma_id) await gunluk(q, k.firma_kod, k.id, 'sifre_degistir', 'kullanici', k.id, {});
       return { surum: u.rows[0].oturum_surumu };
     });
+    if (sonuc.yasak) return hata(c, 403, 'Şifrenizi değiştirme yetkiniz yok. Yöneticinizden şifre sıfırlamasını isteyin.');
     if (sonuc.yanlis) return hata(c, 400, 'Mevcut şifre hatalı.');
     await oturumBaslat(c, k.id, sonuc.surum); // diger oturumlar duser, bu oturum surer
     return c.json({ durum: 'ok', mesaj: 'Şifre değiştirildi. Diğer cihazlardaki oturumlar kapatıldı.' });
@@ -336,7 +341,7 @@ export function yonetimRotalari(app) {
     const roller = r.rows.map((rol) => {
       const kapsam = {}; const eylem = {};
       for (const a of KATALOG.kapsam) kapsam[a.k] = '';
-      for (const a of KATALOG.eylem) eylem[a.k] = false;
+      for (const a of KATALOG.eylem) eylem[a.k] = VARSAYILAN_ACIK.includes(a.k);
       for (const s of iz.rows) {
         if (s.rol_kod !== rol.kod) continue;
         if (s.perm_tip === 'scope' && s.perm_key in kapsam) kapsam[s.perm_key] = s.deger;
@@ -361,8 +366,8 @@ export function yonetimRotalari(app) {
       // Yeni rol hicbir yetkiyle baslar
       await q(`INSERT INTO ${T(kod, 'rol_izinleri')} (rol_kod, perm_tip, perm_key, deger) SELECT $1, 'scope', x, '' FROM unnest($2::text[]) x`,
         [rolKod, KATALOG.kapsam.map((a) => a.k)]);
-      await q(`INSERT INTO ${T(kod, 'rol_izinleri')} (rol_kod, perm_tip, perm_key, deger) SELECT $1, 'action', x, '0' FROM unnest($2::text[]) x`,
-        [rolKod, KATALOG.eylem.map((a) => a.k)]);
+      await q(`INSERT INTO ${T(kod, 'rol_izinleri')} (rol_kod, perm_tip, perm_key, deger) SELECT $1, 'action', x, CASE WHEN x = ANY($3::text[]) THEN '1' ELSE '0' END FROM unnest($2::text[]) x`,
+        [rolKod, KATALOG.eylem.map((a) => a.k), VARSAYILAN_ACIK]);
       await gunluk(q, kod, k.id, 'rol_ekle', 'rol', rolKod, { gorunen_ad: ad });
       return { durum: 'ok', mesaj: 'Rol oluşturuldu. İzinleri düzenleyip kaydedin.' };
     });

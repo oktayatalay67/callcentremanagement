@@ -31,8 +31,11 @@ export const KATALOG = {
     { k: 'firma_profil_duzenle', etiket: 'Firma profilini düzenle' },
     { k: 'rapor_gor', etiket: 'Raporları gör' },
     { k: 'dashboard_gor', etiket: 'Dashboard\'u gör' },
+    { k: 'sifre_degistir', etiket: 'Kendi şifresini değiştir' },
   ],
 };
+// Satiri hic yazilmamis rollerde VARSAYILAN ACIK sayilan izinler (eski roller davranisini korusun)
+export const VARSAYILAN_ACIK = ['sifre_degistir'];
 export const KAPSAM_DEGERLERI = ['TUM', 'KENDI', ''];
 export const KAPSAM_ANAHTARLARI = new Set(KATALOG.kapsam.map((x) => x.k));
 export const EYLEM_ANAHTARLARI = new Set(KATALOG.eylem.map((x) => x.k));
@@ -46,9 +49,11 @@ export async function izinleriYukle(q, firmaKod, rolKod) {
       WHERE i.rol_kod = $1 AND r.aktif`, [rolKod]);
   const kapsam = {};
   const eylem = new Set();
+  const gorulen = new Set();
   for (const s of r.rows) {
     if (s.perm_tip === 'scope') kapsam[s.perm_key] = s.deger;
-    else if (s.perm_tip === 'action' && s.deger === '1') eylem.add(s.perm_key);
+    else if (s.perm_tip === 'action') { gorulen.add(s.perm_key); if (s.deger === '1') eylem.add(s.perm_key); }
   }
+  if (r.rows.length) for (const a of VARSAYILAN_ACIK) if (!gorulen.has(a)) eylem.add(a);
   return { kapsam, eylem };
 }

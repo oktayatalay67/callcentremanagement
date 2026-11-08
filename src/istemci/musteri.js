@@ -308,7 +308,7 @@ function sayfaYukleme() {
 
 // ---------------- Musteri listesi ----------------
 function sayfaMusteriler() {
-  icerik.appendChild(baslik('Müşteriler', eylemVar('excel_yukle') ? el('button', { type: 'button', metin: 'Excel ile yükle', onclick: () => { location.hash = '#/yukleme'; } }) : null));
+  icerik.appendChild(baslik(ben.izinler.kapsam.musteri === 'KENDI' ? 'Aranacak müşterilerim' : 'Müşteriler', eylemVar('excel_yukle') ? el('button', { type: 'button', metin: 'Excel ile yükle', onclick: () => { location.hash = '#/yukleme'; } }) : null));
   const filtre = el('div');
   const liste = el('div');
   const detay = el('div');
