@@ -113,13 +113,13 @@ export function uygulamaOlustur() {
       const dogru = await sifreDogrula(sifre, k ? k.sifre_ozeti : SAHTE_OZET);
       const izinli = !!k && dogru && k.aktif && (firmaKodu === 'platform' || k.firma_durum === 'aktif');
 
-      await q(`INSERT INTO cc.giris_kayitlari (firma_kodu, kullanici_adi, basarili, ip) VALUES ($1, $2, $3, $4)`,
-        [firmaKodu, kadi, izinli, ip]);
+      await q(`INSERT INTO cc.giris_kayitlari (firma_kodu, kullanici_adi, basarili, ip, surum) VALUES ($1, $2, $3, $4, $5)`,
+        [firmaKodu, kadi, izinli, ip, SURUM]);
       if (!izinli) {
         if (k) await q(`UPDATE cc.kullanicilar SET basarisiz_deneme = basarisiz_deneme + 1 WHERE id = $1`, [k.id]);
         return { basarili: false };
       }
-      await q(`UPDATE cc.kullanicilar SET basarisiz_deneme = 0, son_giris = now() WHERE id = $1`, [k.id]);
+      await q(`UPDATE cc.kullanicilar SET basarisiz_deneme = 0, son_giris = now(), son_surum = $2, son_gorulme = now() WHERE id = $1`, [k.id, SURUM]);
       return { basarili: true, id: k.id, surum: k.oturum_surumu };
     });
 

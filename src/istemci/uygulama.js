@@ -56,6 +56,7 @@ function kabuk() {
   const ust = el('div', { 'class': 'ust' }, [
     logo,
     el('span', { 'class': 'firma', metin: ben.platform ? 'Platform yönetimi' : ben.firma_unvan }),
+    el('span', { 'class': 'rozet', title: 'Uygulama sürümü', metin: 'v' + SURUM }),
     el('span', { 'class': 'bosluk' }),
     el('span', { 'class': 'kisi', metin: (ben.ad_soyad || ben.kullanici_adi) + ' · ' + (ben.rol_ad || ben.rol_kod) }),
     el('button', { type: 'button', 'class': 'kucuk ikincil', metin: 'Şifremi değiştir', onclick: () => { location.hash = '#/sifre'; } }),
@@ -66,6 +67,7 @@ function kabuk() {
   if (musteriKapsami()) ogeler.push(['#/musteriler', 'Müşteriler']);
   if (eylemVar('excel_yukle')) ogeler.push(['#/yukleme', 'Excel yükleme']);
   if (eylemVar('kullanici_yonet')) ogeler.push(['#/kullanicilar', 'Kullanıcılar']);
+  if (eylemVar('kullanici_yonet')) ogeler.push(['#/girisler', 'Giriş kayıtları']);
   if (eylemVar('rol_yonet')) ogeler.push(['#/roller', 'Roller ve izinler']);
   const menu = el('nav', { 'class': 'menu' }, ogeler.map((o) => el('a', { href: o[0], 'data-yol': o[0], metin: o[1] })));
   if (ben.platform) {
@@ -83,7 +85,7 @@ function yonlendir() {
   let yol = location.hash || '#/ana';
   const izinli = {
     '#/ana': true, '#/sifre': true, '#/profil': !ben.platform,
-    '#/kullanicilar': eylemVar('kullanici_yonet'), '#/roller': eylemVar('rol_yonet'),
+    '#/kullanicilar': eylemVar('kullanici_yonet'), '#/girisler': eylemVar('kullanici_yonet'), '#/roller': eylemVar('rol_yonet'),
     '#/musteriler': musteriKapsami(), '#/yukleme': eylemVar('excel_yukle'),
   };
   if (!izinli[yol]) yol = '#/ana';
@@ -94,6 +96,7 @@ function yonlendir() {
   if (yol === '#/profil') sayfaProfil();
   else if (yol === '#/kullanicilar') sayfaKullanicilar();
   else if (yol === '#/roller') sayfaRoller();
+  else if (yol === '#/girisler') sayfaGirisler();
   else if (yol === '#/musteriler') sayfaMusteriler();
   else if (yol === '#/yukleme') sayfaYukleme();
   else if (yol === '#/sifre') sayfaSifre();
@@ -113,6 +116,48 @@ function baslik(metin, sag) {
   return el('div', { 'class': 'satir', style: 'margin:0 0 14px;max-width:960px' }, [el('h2', { metin: metin, style: 'margin:0' }), el('span', { 'class': 'bosluk', style: 'flex:1' }), sag]);
 }
 
+// ---------------- Surum notlari (her yayinda en uste eklenir) ----------------
+const SURUM_NOTLARI = [
+  ['0.7.0', 'Sürüm takibi: üst çubukta sürüm, kullanıcı listesinde son sürüm, Giriş kayıtları ekranı.'],
+  ['0.6.1', 'Excel yüklemede hata kodu görünür; yükleme iyileştirmesi.'],
+  ['0.6.0', 'Müşteri listesi ve Excel ile müşteri yükleme (kolon eşleme, geri alma).'],
+  ['0.5.1', 'Firma renkleri (opsiyonel), InspireIT marka renkleri.'],
+  ['0.5.0', 'Firma profili ve logo, kullanıcı yönetimi, roller ve izinler.'],
+];
+
+// ---------------- Giris kayitlari ----------------
+function sayfaGirisler() {
+  icerik.appendChild(baslik('Giriş kayıtları'));
+  const alanAdi = el('div');
+  const kisiGirdi = el('input', { type: 'text', id: 'f_g_kisi', placeholder: 'Kullanıcı adı (boş = hepsi)' });
+  const sonucSec = secim('Sonuç', 'g_sonuc', [['', 'Tümü'], ['basarili', 'Başarılı'], ['hatali', 'Hatalı']], '');
+  const ara = el('button', { type: 'button', metin: 'Listele' });
+  icerik.appendChild(panel([el('div', { 'class': 'izgara' }, [el('div', null, [el('label', { 'for': 'f_g_kisi', metin: 'Kullanıcı' }), kisiGirdi]), sonucSec]), el('div', { 'class': 'satir' }, [ara])]));
+  icerik.appendChild(alanAdi);
+  function getir() {
+    const ps = new URLSearchParams();
+    if (kisiGirdi.value.trim()) ps.set('kullanici', kisiGirdi.value.trim());
+    if (deger('g_sonuc')) ps.set('sonuc', deger('g_sonuc'));
+    api('/api/giris-kayitlari?' + ps.toString()).then((s) => {
+      alanAdi.innerHTML = '';
+      if (!s.ok) { alanAdi.appendChild(el('div', { 'class': 'hata', metin: hataMetni(s) })); return; }
+      alanAdi.appendChild(panel([
+        el('p', { 'class': 'alt', style: 'margin:0 0 10px', metin: 'Son ' + s.j.kayitlar.length + ' kayıt (en yeni üstte). Sürüm, giriş anındaki uygulama sürümüdür; eski kayıtlarda boştur.' }),
+        s.j.kayitlar.length ? el('table', null, [
+          el('thead', null, [el('tr', null, ['Zaman', 'Kullanıcı', 'Sonuç', 'IP', 'Sürüm'].map((b) => el('th', { metin: b })))]),
+          el('tbody', null, s.j.kayitlar.map((g) => el('tr', null, [
+            el('td', { metin: tarih(g.zaman) }), el('td', { metin: g.kullanici_adi }),
+            el('td', null, [el('span', { 'class': 'rozet ' + (g.basarili ? 'yesil' : 'gri'), metin: g.basarili ? 'Başarılı' : 'Hatalı' })]),
+            el('td', { metin: g.ip || '-' }), el('td', { metin: g.surum ? 'v' + g.surum : '-' }),
+          ]))),
+        ]) : el('p', { 'class': 'alt', metin: 'Kayıt yok.' }),
+      ]));
+    });
+  }
+  ara.addEventListener('click', getir);
+  getir();
+}
+
 // ---------------- Ana sayfa ----------------
 function sayfaAna() {
   const liste = el('ul', { style: 'margin:8px 0 0;padding-left:18px;line-height:1.7' });
@@ -126,6 +171,8 @@ function sayfaAna() {
     el('h2', { metin: 'Hoş geldiniz, ' + (ben.ad_soyad || ben.kullanici_adi) }),
     el('p', { 'class': 'alt', metin: ben.platform ? 'Platform yönetimi' : ben.firma_unvan + ' (' + ben.firma_kod + ')' }),
     el('p', { metin: 'Kullanabileceğiniz ekranlar:' }), liste,
+    el('h2', { metin: 'Sürüm geçmişi', style: 'margin-top:22px' }),
+    el('ul', { style: 'margin:0;padding-left:18px;line-height:1.7' }, SURUM_NOTLARI.map((n) => el('li', { metin: 'v' + n[0] + ' — ' + n[1] }))),
     el('p', { 'class': 'alt', style: 'margin-top:16px', metin: 'Atama, arama ekranı ve raporlar sonraki sürümlerde eklenecek.' }),
   ]));
 }
@@ -284,11 +331,13 @@ function sayfaKullanicilar() {
         el('td', { metin: k.kullanici_adi }), el('td', { metin: k.ad_soyad || '' }), el('td', { metin: rolAdi(k.rol_kod) }),
         el('td', { metin: k.yonetici_id ? kisiAdi(k.yonetici_id) : '-' }),
         el('td', null, [el('span', { 'class': 'rozet ' + (k.aktif ? 'yesil' : 'gri'), metin: k.aktif ? 'Aktif' : 'Pasif' })]),
-        el('td', { metin: tarih(k.son_giris) }), islem,
+        el('td', { metin: tarih(k.son_giris) }),
+        el('td', null, [k.son_surum ? el('span', { 'class': 'rozet ' + (k.son_surum === SURUM ? 'yesil' : 'gri'), title: k.son_gorulme ? 'Son görülme: ' + tarih(k.son_gorulme) : '', metin: 'v' + k.son_surum }) : el('span', { metin: '-' })]),
+        islem,
       ]);
     });
     tabloAlani.appendChild(panel([el('table', null, [
-      el('thead', null, [el('tr', null, ['Kullanıcı adı', 'Ad soyad', 'Rol', 'Yönetici', 'Durum', 'Son giriş', ''].map((b) => el('th', { metin: b })))]),
+      el('thead', null, [el('tr', null, ['Kullanıcı adı', 'Ad soyad', 'Rol', 'Yönetici', 'Durum', 'Son giriş', 'Sürüm', ''].map((b) => el('th', { metin: b })))]),
       el('tbody', null, satirlar),
     ])]));
   }

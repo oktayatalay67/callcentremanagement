@@ -13,7 +13,7 @@ import {
 } from './izinler.js';
 import {
   T, HttpHata, hata, jsonGovde, norm, metin, oturumAl, oturumBaslat, tekrarSayisi,
-  KULLANICI_RE, ROL_KOD_RE, UUID_RE, RENK_RE, kontrastBeyaz,
+  KULLANICI_RE, ROL_KOD_RE, UUID_RE, RENK_RE, kontrastBeyaz, SURUM,
 } from './yardimci.js';
 
 const LOGO_MAX = 204800;
@@ -68,6 +68,13 @@ export function yonetimRotalari(app) {
   app.get('/api/ben', async (c) => {
     const k = await oturumAl(c);
     if (!k) return hata(c, 401, 'Oturum yok.');
+    // Hangi surumun kullanildigini kaydet (sayfa her yuklendiginde; yazma sikligi sinirli). Hata oturumu bozmaz.
+    try {
+      await veritabani(c.env.DATABASE_URL).sorgu(
+        `UPDATE cc.kullanicilar SET son_surum = $2, son_gorulme = now()
+          WHERE id = $1 AND (son_surum IS DISTINCT FROM $2 OR son_gorulme IS NULL OR son_gorulme < now() - interval '5 minutes')`,
+        [k.id, SURUM]);
+    } catch (e) { console.error('surum kaydi hatasi:', e && e.code); }
     const temel = {
       durum: 'ok', id: k.id, kullanici_adi: k.kullanici_adi, ad_soyad: k.ad_soyad, rol_kod: k.rol_kod,
       platform: k.firma_id === null, firma_kod: k.firma_kod, firma_unvan: k.firma_unvan,
@@ -189,10 +196,24 @@ export function yonetimRotalari(app) {
 
   // ---------------- Kullanicilar ----------------
   app.get('/api/kullanicilar', (c) => firmaIslemi(c, { izin: 'kullanici_yonet' }, async ({ q, k, kod }) => {
-    const u = await q(`SELECT id, kullanici_adi, ad_soyad, rol_kod, yonetici_id, eposta, telefon, gorev, aktif, son_giris
+    const u = await q(`SELECT id, kullanici_adi, ad_soyad, rol_kod, yonetici_id, eposta, telefon, gorev, aktif, son_giris, son_surum, son_gorulme
                          FROM cc.kullanicilar WHERE firma_id = $1 ORDER BY aktif DESC, kullanici_adi`, [k.firma_id]);
     const r = await q(`SELECT kod, gorunen_ad, aktif FROM ${T(kod, 'roller')} ORDER BY sira, kod`);
     return { durum: 'ok', kullanicilar: u.rows, roller: r.rows };
+  }));
+
+  // Giris kayitlari: YALNIZ oturumdaki firmanin kayitlari (firma kodu istekten alinmaz)
+  app.get('/api/giris-kayitlari', (c) => firmaIslemi(c, { izin: 'kullanici_yonet' }, async ({ q, k }) => {
+    const kisi = metin(c.req.query('kullanici'), 60);
+    const sonuc = c.req.query('sonuc');
+    const par = [k.firma_kod];
+    let kosul = 'firma_kodu = $1';
+    if (kisi) { par.push(norm(kisi)); kosul += ` AND kullanici_adi = $${par.length}`; }
+    if (sonuc === 'basarili') kosul += ' AND basarili';
+    else if (sonuc === 'hatali') kosul += ' AND NOT basarili';
+    const r = await q(`SELECT zaman, kullanici_adi, basarili, ip, surum FROM cc.giris_kayitlari
+                        WHERE ${kosul} ORDER BY zaman DESC LIMIT 300`, par);
+    return { durum: 'ok', kayitlar: r.rows };
   }));
 
   async function rolGecerliMi(q, kod, rolKod) {
