@@ -26,9 +26,10 @@ const YUKLEME_ALANLARI = [
   ['telefon', 'Firma telefonu', ['telefon', 'tel', 'telefonno', 'gsm', 'cep', 'firmatelefon']],
   ['eposta', 'Firma e-postası', ['eposta', 'email', 'mail', 'epostaadresi']],
   ['web', 'Web sitesi', ['web', 'website', 'internet', 'url', 'websitesi']],
-  ['kontak_ad', 'Yetkili adı soyadı', ['yetkili', 'yetkilikisi', 'yetkiliadi', 'kontak', 'kisi', 'adsoyad', 'irtibat', 'irtibatkisisi']],
-  ['kontak_gorev', 'Yetkili görevi', ['gorev', 'pozisyon', 'yetkiligorevi', 'kontakgorevi']],
+  ['kontak_ad', 'Yetkili adı soyadı', ['yetkili', 'yetkilikisi', 'yetkiliadi', 'kontak', 'kisi', 'adsoyad', 'adisoyadi', 'irtibat', 'irtibatkisisi']],
+  ['kontak_gorev', 'Yetkili görevi', ['gorev', 'unvangorev', 'pozisyon', 'yetkiligorevi', 'kontakgorevi']],
   ['kontak_telefon', 'Yetkili telefonu', ['yetkilitelefon', 'yetkilitel', 'yetkilicep', 'kontaktelefon', 'yetkiligsm']],
+  ['kontak_telefon2', 'Yetkili 2. telefonu', ['yetkilitelefon2', 'telefon2', 'tel2', 'cep2', 'gsm2']],
   ['kontak_eposta', 'Yetkili e-postası', ['yetkilieposta', 'yetkilimail', 'kontakeposta']],
 ];
 
@@ -49,6 +50,11 @@ function otomatikEsle(basliklar) {
       if (i >= 0 && !kullanildi[i]) { harita[a[0]] = i; kullanildi[i] = true; }
     }
   });
+  // Kontak listesi dosyasi (her satir bir kisi): Telefon/E-posta kisiye aittir, firmaya degil
+  if (harita.kontak_ad >= 0) {
+    if (harita.kontak_telefon < 0 && harita.telefon >= 0) { harita.kontak_telefon = harita.telefon; harita.telefon = -1; }
+    if (harita.kontak_eposta < 0 && harita.eposta >= 0) { harita.kontak_eposta = harita.eposta; harita.eposta = -1; }
+  }
   return harita;
 }
 
@@ -106,6 +112,8 @@ function sayfaYukleme() {
       return g;
     });
     const ekSakla = el('input', { type: 'checkbox', id: 'f_ek_sakla', checked: 'checked' });
+    const birlestir = el('input', { type: 'checkbox', id: 'f_birlestir' });
+    const birlestirBilgi = el('span', { 'class': 'alt', style: 'margin-left:8px' });
     const onizle = el('div');
     const kutu = el('div', { style: 'display:none' });
     const baslat = el('button', { type: 'button', metin: satirlar.length + ' satırı yükle' });
@@ -118,6 +126,11 @@ function sayfaYukleme() {
     function onizleCiz() {
       const m = eslemeOku();
       onizle.innerHTML = '';
+      if (m.unvan >= 0) {
+        const n = firmalaGrupla(m, false).length;
+        birlestirBilgi.textContent = satirlar.length + ' satır → ' + n + ' benzersiz firma' + (n < satirlar.length ? ' (aynı firma adı/no tek müşteri, satırlar yetkili olur)' : '');
+        baslat.textContent = (birlestir.checked ? n : satirlar.length) + (birlestir.checked ? ' firmayı yükle' : ' satırı yükle');
+      }
       const alanlar = YUKLEME_ALANLARI.filter((a) => m[a[0]] >= 0);
       if (!alanlar.length) return;
       onizle.appendChild(el('p', { 'class': 'alt', style: 'margin:14px 0 6px', metin: 'Önizleme (ilk 5 satır)' }));
@@ -126,62 +139,113 @@ function sayfaYukleme() {
         el('tbody', null, satirlar.slice(0, 5).map((s) => el('tr', null, alanlar.map((a) => el('td', { metin: String(s[m[a[0]]] == null ? '' : s[m[a[0]]]).slice(0, 60) }))))),
       ])]));
     }
-    YUKLEME_ALANLARI.forEach((a) => {
-      const s = document.getElementById('f_e_' + a[0]);
-      if (s) s.addEventListener('change', onizleCiz);
-    });
+
     baslat.addEventListener('click', () => {
       const m = eslemeOku();
       if (m.unvan < 0) { mesaj(kutu, 'hata', 'Firma ünvanı için bir kolon seçmelisiniz.'); return; }
       mesaj(kutu, '', '');
-      yukle(m, ekSakla.checked, baslat, kutu);
+      yukle(m, ekSakla.checked, birlestir.checked, baslat, kutu);
     });
+    birlestir.addEventListener('change', onizleCiz);
 
     sihirbaz.appendChild(panel([
       el('h2', { metin: '2. Kolonları eşleyin' }),
       el('p', { 'class': 'alt', metin: dosyaAdi + ' · ' + satirlar.length + ' satır · ' + basliklar.length + ' kolon. Otomatik eşleme yapıldı; yanlışları düzeltin.' }),
       el('div', { 'class': 'izgara' }, secimler),
-      el('div', { 'class': 'izin', style: 'margin-top:14px' }, [ekSakla, el('label', { 'for': 'f_ek_sakla', metin: 'Eşlenmeyen kolonları "ek alan" olarak müşteri kaydında sakla' })]),
+      el('div', { 'class': 'izin', style: 'margin-top:14px' }, [birlestir, el('label', { 'for': 'f_birlestir', metin: 'Aynı firmaya ait satırları tek müşteride birleştir (her satır bir yetkili)' }), birlestirBilgi]),
+      el('div', { 'class': 'izin' }, [ekSakla, el('label', { 'for': 'f_ek_sakla', metin: 'Eşlenmeyen kolonları "ek alan" olarak müşteri kaydında sakla' })]),
       onizle,
       el('div', { 'class': 'satir' }, [baslat, el('button', { type: 'button', 'class': 'ikincil', metin: 'Başka dosya seç', onclick: dosyaSecimi })]),
       kutu,
     ]));
+    YUKLEME_ALANLARI.forEach((a) => {
+      const s = document.getElementById('f_e_' + a[0]);
+      if (s) s.addEventListener('change', onizleCiz);
+    });
+    { const m0 = eslemeOku(); if (m0.unvan >= 0 && m0.kontak_ad >= 0 && firmalaGrupla(m0, false).length < satirlar.length) birlestir.checked = true; }
     onizleCiz();
   }
 
-  async function yukle(m, ekSakla, dugme, kutu) {
-    dugme.disabled = true;
+  const FIRMA_ALANLARI = ['unvan', 'dis_no', 'sektor', 'il', 'ilce', 'adres', 'telefon', 'eposta', 'web'];
+  const KONTAK_ALANLARI = ['kontak_ad', 'kontak_gorev', 'kontak_telefon', 'kontak_telefon2', 'kontak_eposta'];
+  const bosDegil = (v) => String(v == null ? '' : v).trim() !== '';
+
+  // Satirlari firma bazinda gruplar: ayni dis_no (varsa) veya ayni firma adi -> tek musteri, birden cok yetkili
+  function firmalaGrupla(m, ekSakla) {
     const eslenen = {};
     Object.keys(m).forEach((k2) => { if (m[k2] >= 0) eslenen[m[k2]] = true; });
-    const satirNesne = satirlar.map((s, i) => {
+    const grup = new Map();
+    const sirali = [];
+    satirlar.forEach((s, i) => {
+      const al = (k2) => (m[k2] >= 0 ? s[m[k2]] : '');
+      const ad = baslikSade(al('unvan'));
+      const dis = String(al('dis_no') == null ? '' : al('dis_no')).trim();
+      const anahtar = dis ? 'd:' + dis : (ad ? 'u:' + ad : 'r:' + i);
+      let g = grup.get(anahtar);
+      if (!g) { g = { no: i + 2, kontaklar: [], _gor: {} }; grup.set(anahtar, g); sirali.push(g); }
+      FIRMA_ALANLARI.forEach((k2) => { if (m[k2] >= 0 && !bosDegil(g[k2]) && bosDegil(al(k2))) g[k2] = al(k2); });
+      if (m.kontak_ad >= 0 && bosDegil(al('kontak_ad'))) {
+        const kx = {};
+        KONTAK_ALANLARI.forEach((k2) => { if (m[k2] >= 0) kx[k2] = al(k2); });
+        const kim = baslikSade(kx.kontak_ad) + '|' + String(kx.kontak_eposta || '').toLowerCase();
+        if (!g._gor[kim]) { g._gor[kim] = true; g.kontaklar.push(kx); }
+      }
+      if (ekSakla) {
+        g.ek = g.ek || {};
+        basliklar.forEach((b, j) => { if (!eslenen[j] && bosDegil(s[j]) && !bosDegil(g.ek[b])) g.ek[b] = s[j]; });
+      }
+    });
+    sirali.forEach((g) => { delete g._gor; });
+    return sirali;
+  }
+  function satirlariDuz(m, ekSakla) {
+    const eslenen = {};
+    Object.keys(m).forEach((k2) => { if (m[k2] >= 0) eslenen[m[k2]] = true; });
+    return satirlar.map((s, i) => {
       const o = { no: i + 2 };
       Object.keys(m).forEach((k2) => { if (m[k2] >= 0) o[k2] = s[m[k2]]; });
       if (ekSakla) {
         const ek = {};
-        basliklar.forEach((b, j) => { if (!eslenen[j] && String(s[j] == null ? '' : s[j]).trim() !== '') ek[b] = s[j]; });
+        basliklar.forEach((b, j) => { if (!eslenen[j] && bosDegil(s[j])) ek[b] = s[j]; });
         o.ek = ek;
       }
       return o;
     });
+  }
+
+  async function yukle(m, ekSakla, birlestir, dugme, kutu) {
+    dugme.disabled = true;
+    const satirNesne = birlestir ? firmalaGrupla(m, ekSakla) : satirlariDuz(m, ekSakla);
     const bas = await api('/api/yuklemeler', { dosya_adi: dosyaAdi, satir_sayisi: satirNesne.length });
     if (!bas.ok) { dugme.disabled = false; mesaj(kutu, 'hata', hataMetni(bas)); return; }
-    const parca = bas.j.parca_max || 300;
-    let eklenen = 0; let mukerrer = 0; let bos = 0; const hatalar = [];
-    for (let i = 0; i < satirNesne.length; i += parca) {
-      mesaj(kutu, 'basari', 'Yükleniyor… ' + Math.min(i + parca, satirNesne.length) + ' / ' + satirNesne.length);
-      const s = await api('/api/yuklemeler/' + bas.j.id + '/satirlar', { satirlar: satirNesne.slice(i, i + parca) });
+    const parca = bas.j.parca_max || 60;
+    const KONTAK_PARCA = 150;
+    const parcalar = [];
+    let gecerli = [];
+    let kSay = 0;
+    satirNesne.forEach((o) => {
+      const kn = (o.kontaklar ? o.kontaklar.length : 1);
+      if (gecerli.length && (gecerli.length >= parca || kSay + kn > KONTAK_PARCA)) { parcalar.push(gecerli); gecerli = []; kSay = 0; }
+      gecerli.push(o); kSay += kn;
+    });
+    if (gecerli.length) parcalar.push(gecerli);
+    let eklenen = 0; let mukerrer = 0; let bos = 0; let kontak = 0; let islenen = 0; const hatalar = [];
+    for (let i = 0; i < parcalar.length; i++) {
+      mesaj(kutu, 'basari', 'Yükleniyor… ' + islenen + ' / ' + satirNesne.length);
+      const s = await api('/api/yuklemeler/' + bas.j.id + '/satirlar', { satirlar: parcalar[i] });
+      islenen += parcalar[i].length;
       if (!s.ok) {
         dugme.disabled = false;
         mesaj(kutu, 'hata', hataMetni(s) + ' (Şu ana kadar ' + eklenen + ' kayıt eklendi; yükleme geçmişinden geri alabilirsiniz.)');
         gecmisYukle();
         return;
       }
-      eklenen += s.j.eklenen; mukerrer += s.j.mukerrer; bos += s.j.bos;
+      eklenen += s.j.eklenen; mukerrer += s.j.mukerrer; bos += s.j.bos; kontak += (s.j.kontak || 0);
       (s.j.hatalar || []).forEach((h) => { if (hatalar.length < 20) hatalar.push(h); });
     }
     sihirbaz.innerHTML = '';
     const liste = el('ul', { style: 'margin:8px 0 0;padding-left:18px;line-height:1.7' }, [
-      el('li', { metin: 'Eklenen: ' + eklenen }),
+      el('li', { metin: 'Eklenen müşteri: ' + eklenen + (kontak ? ' · eklenen yetkili: ' + kontak : '') }),
       el('li', { metin: 'Mükerrer (aynı müşteri no zaten var) atlanan: ' + mukerrer }),
       el('li', { metin: 'Ünvanı boş olduğu için atlanan: ' + bos }),
     ]);

@@ -118,6 +118,7 @@ function baslik(metin, sag) {
 
 // ---------------- Surum notlari (her yayinda en uste eklenir) ----------------
 const SURUM_NOTLARI = [
+  ['0.7.1', 'Excel yükleme: aynı firmanın satırları tek müşteride birleştirilir (yetkili listesi), küçük parçalarla yükleme, daha açıklayıcı hata.'],
   ['0.7.0', 'Sürüm takibi: üst çubukta sürüm, kullanıcı listesinde son sürüm, Giriş kayıtları ekranı.'],
   ['0.6.1', 'Excel yüklemede hata kodu görünür; yükleme iyileştirmesi.'],
   ['0.6.0', 'Müşteri listesi ve Excel ile müşteri yükleme (kolon eşleme, geri alma).'],

@@ -9,7 +9,9 @@
 import { T, HttpHata, jsonGovde } from './yardimci.js';
 import { firmaIslemi, gunluk, idAl } from './yonetim.js';
 
-const SATIR_PARCA_MAX = 300;        // tek istekte en cok satir
+const SATIR_PARCA_MAX = 60;         // tek istekte en cok firma (kucuk tutulur: sunucu CPU/sure sinirlari)
+const KONTAK_PARCA_MAX = 200;       // tek istekte en cok yetkili
+const FIRMA_KONTAK_MAX = 40;        // bir firmada en cok yetkili
 const YUKLEME_SATIR_MAX = 20000;    // tek dosyada en cok satir
 const EK_ALAN_MAX = 20;
 
@@ -73,6 +75,7 @@ export function musteriRotalari(app) {
     const kont = [];   // { musteriId, ad, gorev, tel, ep }
     const hatalar = [];
     let atlananBos = 0;
+    let kontSayisi = 0;
     g.satirlar.forEach((s, i) => {
       if (!s || typeof s !== 'object') { atlananBos++; return; }
       const unvan = kisalt(s.unvan, 300);
@@ -89,8 +92,20 @@ export function musteriRotalari(app) {
       m.sektor.push(kisalt(s.sektor, 100)); m.il.push(kisalt(s.il, 60)); m.ilce.push(kisalt(s.ilce, 60));
       m.adres.push(kisalt(s.adres, 500)); m.tel.push(telefonNorm(s.telefon));
       m.ep.push(kisalt(s.eposta, 200)); m.web.push(kisalt(s.web, 200)); m.ek.push(JSON.stringify(ek));
-      const kad = kisalt(s.kontak_ad, 200);
-      if (kad) kont.push({ mid, ad: kad, gorev: kisalt(s.kontak_gorev, 100), tel: telefonNorm(s.kontak_telefon), ep: kisalt(s.kontak_eposta, 200) });
+      // Yetkililer: kontaklar dizisi (firma basina birlesik satirlar) veya tek kontak_* alanlari
+      const liste = Array.isArray(s.kontaklar) ? s.kontaklar.slice(0, FIRMA_KONTAK_MAX) : [s];
+      liste.forEach((kx) => {
+        if (!kx || typeof kx !== 'object') return;
+        const kad = kisalt(kx.kontak_ad !== undefined ? kx.kontak_ad : kx.ad, 200);
+        if (kad) {
+          kontSayisi++;
+          if (kontSayisi > KONTAK_PARCA_MAX) throw new HttpHata(400, 'Tek seferde en çok ' + KONTAK_PARCA_MAX + ' yetkili gönderilebilir.');
+          kont.push({ mid, ad: kad, gorev: kisalt(kx.kontak_gorev !== undefined ? kx.kontak_gorev : kx.gorev, 100),
+            tel: telefonNorm(kx.kontak_telefon !== undefined ? kx.kontak_telefon : kx.telefon),
+            tel2: telefonNorm(kx.kontak_telefon2 !== undefined ? kx.kontak_telefon2 : kx.telefon2),
+            ep: kisalt(kx.kontak_eposta !== undefined ? kx.kontak_eposta : kx.eposta, 200) });
+        }
+      });
     });
 
     let eklenenIds = [];
@@ -100,7 +115,7 @@ export function musteriRotalari(app) {
          SELECT t.id, t.dis, t.unvan, t.sektor, t.il, t.ilce, t.adres, t.tel, t.ep, t.web, t.ek::jsonb, $12
            FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[], $10::text[], $11::text[])
                 AS t(id, dis, unvan, sektor, il, ilce, adres, tel, ep, web, ek)
-         ON CONFLICT (dis_no) WHERE dis_no IS NOT NULL AND NOT silindi DO NOTHING
+         ON CONFLICT DO NOTHING
          RETURNING id`,
         [m.id, m.dis, m.unvan, m.sektor, m.il, m.ilce, m.adres, m.tel, m.ep, m.web, m.ek, id]);
       eklenenIds = r.rows.map((x) => x.id);
@@ -109,15 +124,15 @@ export function musteriRotalari(app) {
     const kk = kont.filter((x) => eklenenKume.has(x.mid));
     if (kk.length) {
       await q(
-        `INSERT INTO ${T(kod, 'kontaklar')} (musteri_id, ad_soyad, gorev, telefon, eposta)
-         SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[])`,
-        [kk.map((x) => x.mid), kk.map((x) => x.ad), kk.map((x) => x.gorev), kk.map((x) => x.tel), kk.map((x) => x.ep)]);
+        `INSERT INTO ${T(kod, 'kontaklar')} (musteri_id, ad_soyad, gorev, telefon, telefon2, eposta)
+         SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[])`,
+        [kk.map((x) => x.mid), kk.map((x) => x.ad), kk.map((x) => x.gorev), kk.map((x) => x.tel), kk.map((x) => x.tel2), kk.map((x) => x.ep)]);
     }
     const eklenen = eklenenIds.length;
     const mukerrer = m.id.length - eklenen;
     const atlanan = mukerrer + atlananBos;
     await q(`UPDATE ${T(kod, 'yuklemeler')} SET eklenen = eklenen + $2, atlanan = atlanan + $3 WHERE id = $1`, [id, eklenen, atlanan]);
-    return { durum: 'ok', eklenen, mukerrer, bos: atlananBos, hatalar };
+    return { durum: 'ok', eklenen, mukerrer, bos: atlananBos, kontak: kk.length, hatalar };
   }));
 
   // ---- Yukleme gecmisi ----

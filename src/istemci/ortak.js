@@ -64,9 +64,11 @@ function mesaj(kutu, sinif, metin) {
   kutu.style.display = metin ? 'block' : 'none';
 }
 function hataMetni(s, varsayilan) {
-  const m = (s && s.j && s.j.mesaj) || varsayilan || 'İşlem başarısız.';
+  let m = (s && s.j && s.j.mesaj) || varsayilan || 'İşlem başarısız.';
   const k = s && s.j && s.j.hata_kodu;
-  return k ? m + ' (hata kodu: ' + k + ')' : m;
+  if (k) m += ' (hata kodu: ' + k + ')';
+  else if (s && !s.ok && s.durum >= 500 && !(s.j && s.j.mesaj)) m += ' (HTTP ' + s.durum + ' — sunucu JSON yanıtı vermedi: süre/CPU sınırı veya ağ hatası olabilir)';
+  return m;
 }
 function tarih(iso) {
   if (!iso) return '-';
