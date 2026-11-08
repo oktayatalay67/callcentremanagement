@@ -1,29 +1,62 @@
 // =====================================================================
-// src/sayfalar.js  -  Arayuz sayfalari ve istemci kodu (v0.4.0)
-// Sayfa kodu ayri dosya olarak sunulur (/app.js, /kurulum.js) cunku
-// icerik guvenlik politikasi (CSP) satir ici betige izin vermez.
-// DIKKAT: Asagidaki istemci kodlarinda ters tirnak ve dolar-suslu parantez YOK.
+// src/sayfalar.js  -  HTML iskeleti ve stiller (v0.5.0)
+// Istemci kodu src/istemci/*.js dosyalarinda yazilir, "npm run istemci" ile
+// src/istemci.gen.js'e gomulur. CSP satir ici betige izin vermedigi icin
+// betikler /app.js ve /kurulum.js olarak ayri sunulur.
 // =====================================================================
-export const SURUM_ETIKETI = 'v0.4.0';
-
 const STIL = `
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f3f5f8;color:#1c2430}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f3f5f8;color:#1c2430;font-size:14px}
 main{max-width:420px;margin:8vh auto;padding:0 16px}
+main.genis{max-width:none;margin:0;padding:0}
 .kart{background:#fff;border:1px solid #dde3ea;border-radius:10px;padding:28px}
-h1{font-size:20px;margin:0 0 4px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:0 0 12px}
 .alt{color:#5c6b7d;font-size:13px;margin:0 0 20px}
 label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
-input{width:100%;padding:10px 12px;font-size:15px;border:1px solid #b9c4d0;border-radius:6px}
-input:focus{outline:2px solid #2f6fdb;border-color:#2f6fdb}
-button{margin-top:20px;width:100%;padding:11px;font-size:15px;font-weight:600;color:#fff;background:#2f6fdb;border:0;border-radius:6px;cursor:pointer}
+input,select,textarea{width:100%;padding:9px 11px;font-size:14px;border:1px solid #b9c4d0;border-radius:6px;background:#fff;font-family:inherit}
+input[type=checkbox]{width:auto}
+input:focus,select:focus,textarea:focus{outline:2px solid #2f6fdb;border-color:#2f6fdb}
+input:disabled,select:disabled{background:#eef1f5;color:#5c6b7d}
+button{padding:9px 14px;font-size:14px;font-weight:600;color:#fff;background:#2f6fdb;border:0;border-radius:6px;cursor:pointer}
 button:disabled{opacity:.6;cursor:wait}
-button.ikincil{background:#fff;color:#2f6fdb;border:1px solid #2f6fdb;margin-top:12px}
+button.tam{width:100%;margin-top:20px;padding:11px;font-size:15px}
+button.ikincil{background:#fff;color:#2f6fdb;border:1px solid #2f6fdb}
+button.tehlike{background:#b42318}
+button.kucuk{padding:5px 9px;font-size:12px}
 .hata{margin-top:14px;padding:10px 12px;background:#fdecea;color:#8a1c14;border-radius:6px;font-size:14px}
 .basari{margin-top:14px;padding:10px 12px;background:#e6f4ea;color:#14532d;border-radius:6px;font-size:14px}
 dl{margin:16px 0 0;font-size:14px}dt{color:#5c6b7d;font-size:12px;margin-top:10px}dd{margin:2px 0 0;font-weight:600}
-.sürüm{text-align:center;color:#8a96a5;font-size:12px;margin-top:14px}
+.surum{text-align:center;color:#8a96a5;font-size:12px;margin-top:14px}
 a{color:#2f6fdb}
+/* uygulama kabugu */
+.ust{display:flex;align-items:center;gap:14px;background:#fff;border-bottom:1px solid #dde3ea;padding:10px 20px;height:58px}
+.ust .logo{height:36px;max-width:140px;object-fit:contain}
+.ust .firma{font-weight:700;font-size:16px}
+.ust .bosluk{flex:1}
+.ust .kisi{color:#5c6b7d;font-size:13px}
+.govde{display:flex;min-height:calc(100vh - 58px)}
+.menu{width:210px;background:#fff;border-right:1px solid #dde3ea;padding:14px 10px}
+.menu a{display:block;padding:9px 12px;margin-bottom:2px;border-radius:6px;color:#1c2430;text-decoration:none;font-weight:600}
+.menu a:hover{background:#eef3fb}
+.menu a.aktif{background:#2f6fdb;color:#fff}
+.icerik{flex:1;padding:24px;min-width:0}
+.panel{background:#fff;border:1px solid #dde3ea;border-radius:10px;padding:20px;margin-bottom:18px;max-width:960px}
+.izgara{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.satir{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:#5c6b7d;font-size:12px;font-weight:600;padding:8px;border-bottom:1px solid #dde3ea}
+td{padding:9px 8px;border-bottom:1px solid #eef1f5;vertical-align:middle}
+tr.pasif td{color:#8a96a5}
+.rozet{display:inline-block;padding:2px 8px;border-radius:10px;background:#eef1f5;font-size:12px;font-weight:600}
+.rozet.yesil{background:#e6f4ea;color:#14532d}.rozet.gri{background:#eef1f5;color:#5c6b7d}
+.iki{display:grid;grid-template-columns:240px 1fr;gap:18px;max-width:1100px}
+.rol{padding:10px 12px;border:1px solid #dde3ea;border-radius:8px;margin-bottom:8px;cursor:pointer;background:#fff}
+.rol.secili{border-color:#2f6fdb;background:#eef3fb}
+.izin{display:flex;align-items:center;gap:8px;padding:5px 0}
+.izin input{margin:0}.izin label{margin:0;font-weight:400}
+.logokutu{display:flex;align-items:center;gap:16px;margin:8px 0}
+.logokutu img{max-height:64px;max-width:200px;border:1px solid #dde3ea;border-radius:6px;padding:4px;background:#fff}
+@media(max-width:800px){.izgara,.iki{grid-template-columns:1fr}.menu{width:150px}}
 `;
 
 function sayfa(baslik, betik) {
@@ -35,115 +68,3 @@ function sayfa(baslik, betik) {
 
 export const girisSayfasi = () => sayfa('Çağrı Merkezi Platformu', '/app.js');
 export const kurulumSayfasi = () => sayfa('Platform Kurulumu', '/kurulum.js');
-
-// ---- Ortak istemci yardimcilari (iki betikte de kullanilir) ----
-const ORTAK = `
-var kok = document.getElementById('kok');
-function el(ad, ozellik, cocuklar) {
-  var e = document.createElement(ad);
-  if (ozellik) { for (var k in ozellik) { if (k === 'metin') { e.textContent = ozellik[k]; } else { e.setAttribute(k, ozellik[k]); } } }
-  (cocuklar || []).forEach(function (c) { if (c) { e.appendChild(c); } });
-  return e;
-}
-function alan(etiket, ad, tip, ipucu) {
-  var giris = el('input', { type: tip || 'text', name: ad, id: 'f_' + ad, autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false' });
-  if (ipucu) { giris.setAttribute('placeholder', ipucu); }
-  return el('div', null, [el('label', { 'for': 'f_' + ad, metin: etiket }), giris]);
-}
-function deger(ad) { return document.getElementById('f_' + ad).value; }
-function api(yol, govde, basliklar) {
-  var secenek = { method: govde ? 'POST' : 'GET', credentials: 'same-origin', headers: {} };
-  if (govde) { secenek.headers['Content-Type'] = 'application/json'; secenek.body = JSON.stringify(govde); }
-  if (basliklar) { for (var k in basliklar) { secenek.headers[k] = basliklar[k]; } }
-  return fetch(yol, secenek).then(function (r) {
-    return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, durum: r.status, j: j }; });
-  }).catch(function () { return { ok: false, durum: 0, j: { mesaj: 'Sunucuya ulaşılamadı.' } }; });
-}
-function mesaj(kutu, sinif, metin) {
-  kutu.className = sinif; kutu.textContent = metin; kutu.style.display = metin ? 'block' : 'none';
-}
-`;
-
-export const APP_JS = ORTAK + `
-function girisEkrani() {
-  var kutu = el('div', { style: 'display:none' });
-  var dugme = el('button', { type: 'submit', metin: 'Giriş yap' });
-  var form = el('form', { novalidate: 'novalidate' }, [
-    alan('Firma kodu', 'firma_kodu', 'text', 'ör. demo'),
-    alan('Kullanıcı adı', 'kullanici_adi', 'text'),
-    alan('Şifre', 'sifre', 'password'),
-    dugme, kutu
-  ]);
-  form.addEventListener('submit', function (olay) {
-    olay.preventDefault();
-    mesaj(kutu, '', ''); dugme.disabled = true;
-    api('/api/giris', { firma_kodu: deger('firma_kodu'), kullanici_adi: deger('kullanici_adi'), sifre: deger('sifre') }).then(function (s) {
-      dugme.disabled = false;
-      if (s.ok) { panel(); } else { mesaj(kutu, 'hata', (s.j && s.j.mesaj) || 'Giriş başarısız.'); }
-    });
-  });
-  kok.innerHTML = '';
-  kok.appendChild(el('div', { 'class': 'kart' }, [
-    el('h1', { metin: 'Çağrı Merkezi Platformu' }),
-    el('p', { 'class': 'alt', metin: 'Firma kodunuz, kullanıcı adınız ve şifrenizle giriş yapın.' }),
-    form
-  ]));
-  kok.appendChild(el('div', { 'class': 'sürüm', metin: '${SURUM_ETIKETI}' }));
-}
-
-function panel() {
-  api('/api/ben').then(function (s) {
-    if (!s.ok) { girisEkrani(); return; }
-    var b = s.j;
-    var cikis = el('button', { type: 'button', 'class': 'ikincil', metin: 'Çıkış yap' });
-    cikis.addEventListener('click', function () { api('/api/cikis', {}).then(girisEkrani); });
-    var liste = el('dl', null, [
-      el('dt', { metin: 'Kullanıcı' }), el('dd', { metin: b.ad_soyad || b.kullanici_adi }),
-      el('dt', { metin: 'Firma' }), el('dd', { metin: b.platform ? 'Platform yönetimi' : (b.firma_unvan + ' (' + b.firma_kod + ')') }),
-      el('dt', { metin: 'Rol' }), el('dd', { metin: b.rol_kod })
-    ]);
-    kok.innerHTML = '';
-    kok.appendChild(el('div', { 'class': 'kart' }, [
-      el('h1', { metin: 'Giriş başarılı' }),
-      el('p', { 'class': 'alt', metin: 'Uygulama ekranları sonraki sürümlerde eklenecek.' }),
-      liste, cikis
-    ]));
-    kok.appendChild(el('div', { 'class': 'sürüm', metin: '${SURUM_ETIKETI}' }));
-  });
-}
-panel();
-`;
-
-export const KURULUM_JS = ORTAK + `
-function bolum(baslik, aciklama, alanlar, dugmeMetni, gonder) {
-  var kutu = el('div', { style: 'display:none' });
-  var dugme = el('button', { type: 'submit', metin: dugmeMetni });
-  var form = el('form', { novalidate: 'novalidate', style: 'margin-top:22px;padding-top:6px;border-top:1px solid #dde3ea' },
-    [el('h1', { metin: baslik, style: 'margin-top:14px' }), el('p', { 'class': 'alt', metin: aciklama })].concat(alanlar).concat([dugme, kutu]));
-  form.addEventListener('submit', function (olay) {
-    olay.preventDefault(); mesaj(kutu, '', ''); dugme.disabled = true;
-    gonder(deger('anahtar')).then(function (s) {
-      dugme.disabled = false;
-      if (s.ok) { mesaj(kutu, 'basari', (s.j && s.j.mesaj) || 'Tamam.'); }
-      else { mesaj(kutu, 'hata', (s.j && s.j.mesaj) || 'İşlem başarısız.'); }
-    });
-  });
-  return form;
-}
-kok.appendChild(el('div', { 'class': 'kart' }, [
-  el('h1', { metin: 'Platform kurulumu' }),
-  el('p', { 'class': 'alt', metin: 'Yalnızca kurulum anahtarını bilen kişi kullanabilir. Anahtar sunucuda gizli değişken olarak saklanır.' }),
-  alan('Kurulum anahtarı', 'anahtar', 'password'),
-  bolum('1) Platform yöneticisi', 'Tüm firmaları yöneten kullanıcı. Yalnızca bir kez oluşturulabilir.',
-    [alan('Kullanıcı adı', 'p_kullanici', 'text'), alan('Şifre (en az 10 karakter)', 'p_sifre', 'password')],
-    'Platform yöneticisini oluştur',
-    function (anahtar) { return api('/api/kurulum/platform-admin', { kullanici_adi: deger('p_kullanici'), sifre: deger('p_sifre') }, { 'X-Kurulum-Anahtari': anahtar }); }),
-  bolum('2) Firma ve firma yöneticisi', 'Firma yoksa tabloları kurulur; firmanın yöneticisi yoksa oluşturulur.',
-    [alan('Firma kodu (küçük harf/rakam)', 'f_kod', 'text'), alan('Firma ünvanı', 'f_unvan', 'text'),
-     alan('Yönetici kullanıcı adı', 'f_kullanici', 'text'), alan('Yönetici ad soyad', 'f_ad', 'text'),
-     alan('Yönetici şifresi (en az 10 karakter)', 'f_sifre', 'password')],
-    'Firmayı ve yöneticisini oluştur',
-    function (anahtar) { return api('/api/kurulum/firma', { firma_kodu: deger('f_kod'), unvan: deger('f_unvan'), admin_kullanici_adi: deger('f_kullanici'), admin_ad_soyad: deger('f_ad'), admin_sifre: deger('f_sifre') }, { 'X-Kurulum-Anahtari': anahtar }); })
-]));
-kok.appendChild(el('div', { 'class': 'sürüm', metin: '${SURUM_ETIKETI}' }));
-`;

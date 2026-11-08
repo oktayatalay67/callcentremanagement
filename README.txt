@@ -1,4 +1,4 @@
-cc-platform v0.4.0 - Adim 4: giris sistemi (firma kodu + kullanici + sifre)
+cc-platform v0.5.0 - Adim 5: firma yonetici ekrani (profil+logo, kullanicilar, roller/izinler, sifre)
 
 CALISMA AKISI
   1) Kod 'test' dalina gonderilir (git).
@@ -22,3 +22,7 @@ SAYFALAR:   /          giris
 BASKA SUNUCUYA TASIMA:
   DATABASE_URL=... OTURUM_ANAHTARI=... KURULUM_ANAHTARI=... node src/node.js
 Platforma bagli tek dosya: src/worker.js (+ wrangler.toml).
+
+ISTEMCI KODU (arayuz)
+  Kaynak: src/istemci/*.js  ->  uretilen: src/istemci.gen.js  (elle degistirme)
+  Arayuzde degisiklik yapildiktan sonra:  npm run istemci

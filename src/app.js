@@ -1,5 +1,5 @@
 // =====================================================================
-// src/app.js  -  Uygulama (v0.4.0)  -  PLATFORMDAN BAGIMSIZ
+// src/app.js  -  Uygulama (v0.5.0)  -  PLATFORMDAN BAGIMSIZ
 // ---------------------------------------------------------------------
 // Cloudflare Workers, Node.js, Deno, Bun: hepsinde ayni kodla calisir.
 // Ortam degiskenleri disaridan "env" olarak verilir (platform giris dosyasi):
@@ -9,73 +9,23 @@
 //   SIFRE_TEKRAR      (istege bagli) PBKDF2 tekrar sayisi, varsayilan 100000
 // ---------------------------------------------------------------------
 import { Hono } from 'hono';
-import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
+import { bodyLimit } from 'hono/body-limit';
+import { deleteCookie } from 'hono/cookie';
 import { veritabani } from './db.js';
+import { sifreOzeti, sifreDogrula, SAHTE_OZET, anahtarEsitMi } from './guvenlik.js';
+import { girisSayfasi, kurulumSayfasi } from './sayfalar.js';
+import { APP_JS, KURULUM_JS } from './istemci.gen.js';
+import { yonetimRotalari } from './yonetim.js';
 import {
-  sifreOzeti, sifreDogrula, SAHTE_OZET, VARSAYILAN_TEKRAR,
-  jetonImzala, jetonDogrula, anahtarEsitMi,
-} from './guvenlik.js';
-import { girisSayfasi, kurulumSayfasi, APP_JS, KURULUM_JS } from './sayfalar.js';
+  SURUM, COOKIE, FIRMA_KOD_RE, KULLANICI_RE, norm, hata, jsonGovde, istemciIp, tekrarSayisi,
+  oturumAnahtari, oturumAl, oturumBaslat,
+} from './yardimci.js';
 
-export const SURUM = '0.4.0';
+export { SURUM };
 
-const COOKIE = 'oturum';
-const OTURUM_SURE_SN = 12 * 3600;
 const KILIT_DENEME = 5;
 const KILIT_DAKIKA = 15;
 const GENEL_GIRIS_HATASI = 'Firma kodu, kullanıcı adı veya şifre hatalı.';
-
-const FIRMA_KOD_RE = /^[a-z0-9]{1,20}$/;
-const KULLANICI_RE = /^[a-z0-9._@-]{2,60}$/;
-
-const norm = (v) => String(v == null ? '' : v).trim().toLowerCase().slice(0, 100);
-const hata = (c, durum, mesaj, kod) => c.json({ durum: 'hata', mesaj, ...(kod ? { hata_kodu: kod } : {}) }, durum);
-
-async function jsonGovde(c) {
-  try {
-    const g = await c.req.json();
-    return g && typeof g === 'object' && !Array.isArray(g) ? g : null;
-  } catch (e) {
-    return null;
-  }
-}
-function httpsMi(c) {
-  try {
-    return new URL(c.req.url).protocol === 'https:' || c.req.header('x-forwarded-proto') === 'https';
-  } catch (e) {
-    return false;
-  }
-}
-function istemciIp(c) {
-  return (c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || '').slice(0, 64) || null;
-}
-function tekrarSayisi(c) {
-  const n = parseInt(c.env && c.env.SIFRE_TEKRAR, 10);
-  return n >= 1000 ? n : VARSAYILAN_TEKRAR;
-}
-function oturumAnahtari(c) {
-  const a = c.env && c.env.OTURUM_ANAHTARI;
-  return typeof a === 'string' && a.length >= 32 ? a : null;
-}
-
-// Gecerli oturumun kullanicisini DB'den okur; her istekte aktiflik ve oturum surumu kontrol edilir.
-async function oturumAl(c) {
-  const anahtar = oturumAnahtari(c);
-  if (!anahtar) return null;
-  const jeton = getCookie(c, COOKIE);
-  if (!jeton) return null;
-  const yuk = await jetonDogrula(jeton, anahtar);
-  if (!yuk || !yuk.u) return null;
-  const r = await veritabani(c.env.DATABASE_URL).sorgu(
-    `SELECT u.id, u.kullanici_adi, u.ad_soyad, u.rol_kod, u.firma_id, u.aktif, u.oturum_surumu,
-            f.kod AS firma_kod, f.unvan AS firma_unvan, f.durum AS firma_durum
-       FROM cc.kullanicilar u LEFT JOIN cc.firmalar f ON f.id = u.firma_id
-      WHERE u.id = $1`, [yuk.u]);
-  const k = r.rows[0];
-  if (!k || !k.aktif || k.oturum_surumu !== yuk.v) return null;
-  if (k.firma_id && k.firma_durum !== 'aktif') return null;
-  return k;
-}
 
 async function kurulumYetkisi(c) {
   const a = c.env && c.env.KURULUM_ANAHTARI;
@@ -101,7 +51,8 @@ export function uygulamaOlustur() {
       "img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
   });
 
-  // ---- API korumasi: JSON zorunlu + ayni kaynak (Origin) denetimi ----
+  // ---- API korumasi: govde siniri + JSON zorunlu + ayni kaynak (Origin) denetimi ----
+  app.use('/api/*', bodyLimit({ maxSize: 400 * 1024, onError: (c) => hata(c, 413, 'İstek çok büyük.') }));
   app.use('/api/*', async (c, next) => {
     if (c.req.method !== 'GET') {
       const o = c.req.header('origin');
@@ -175,11 +126,7 @@ export function uygulamaOlustur() {
     }
     if (!sonuc.basarili) return hata(c, 401, GENEL_GIRIS_HATASI);
 
-    const jeton = await jetonImzala(
-      { u: sonuc.id, v: sonuc.surum, e: Math.floor(Date.now() / 1000) + OTURUM_SURE_SN }, oturumAnahtari(c));
-    setCookie(c, COOKIE, jeton, {
-      httpOnly: true, secure: httpsMi(c), sameSite: 'Strict', path: '/', maxAge: OTURUM_SURE_SN,
-    });
+    await oturumBaslat(c, sonuc.id, sonuc.surum);
     return c.json({ durum: 'ok' });
   });
 
@@ -188,14 +135,8 @@ export function uygulamaOlustur() {
     return c.json({ durum: 'ok' });
   });
 
-  app.get('/api/ben', async (c) => {
-    const k = await oturumAl(c);
-    if (!k) return hata(c, 401, 'Oturum yok.');
-    return c.json({
-      durum: 'ok', kullanici_adi: k.kullanici_adi, ad_soyad: k.ad_soyad, rol_kod: k.rol_kod,
-      platform: k.firma_id === null, firma_kod: k.firma_kod, firma_unvan: k.firma_unvan,
-    });
-  });
+  // ---- Firma yonetim API'si (profil, kullanicilar, roller, sifre, /api/ben) ----
+  yonetimRotalari(app);
 
   // ---- Kurulum (kurulum anahtari ile korunur) ----
   app.post('/api/kurulum/platform-admin', async (c) => {
