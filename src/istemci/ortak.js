@@ -44,6 +44,17 @@ function secim(etiket, ad, secenekler, secili, devre) {
   return el('div', null, [el('label', { 'for': 'f_' + ad, metin: etiket }), s]);
 }
 
+// Acilir liste (dropdown) YERINE secenek dugmeleri. Deger gizli alanda tutulur (deger(ad) ile okunur).
+function secimChip(etiket, ad, secenekler, secili, onSec) {
+  const gizli = el('input', { type: 'hidden', id: 'f_' + ad, name: ad }); gizli.value = secili || '';
+  const kap = el('div', { 'class': 'secenekler', style: 'margin:4px 0' });
+  function ciz() {
+    kap.innerHTML = '';
+    secenekler.forEach((x) => kap.appendChild(el('button', { type: 'button', 'class': 'sec' + (gizli.value === x[0] ? ' aktif' : ''), metin: x[1], onclick: () => { gizli.value = x[0]; ciz(); if (onSec) onSec(x[0]); } })));
+  }
+  ciz();
+  return el('div', null, [el('label', { metin: etiket }), kap, gizli]);
+}
 function deger(ad) { return document.getElementById('f_' + ad).value; }
 
 function api(yol, govde, yontem, basliklar) {

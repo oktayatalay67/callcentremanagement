@@ -57,6 +57,11 @@ button.sec{background:#fff;color:#1c2430;border:1px solid #c5ced9}button.sec.akt
 .metin{white-space:pre-wrap;background:#f9fafb;border:1px solid #e5e9ef;border-radius:6px;padding:10px;margin:6px 0;font-size:14px}
 label.onay{display:inline-flex;align-items:center;gap:4px;font-weight:400;margin-right:12px}
 .icerik-kutu{border:1px solid #e5e9ef;border-radius:8px;padding:10px;margin:8px 0}
+.kisiler{display:flex;flex-direction:column;gap:6px}
+.kisi{border:1px solid #dde3ea;border-radius:8px;padding:8px 10px;cursor:pointer;background:#fff}
+.kisi.secili{border-color:var(--ana);background:color-mix(in srgb, var(--ana) 7%, #fff)}
+.kisi.yasak{border-color:#b42318;background:#fdf3f2;cursor:not-allowed}
+.kisi .isaret{color:var(--ana);font-size:16px;width:16px}
 .panel{background:#fff;border:1px solid #dde3ea;border-radius:10px;padding:20px;margin-bottom:18px;max-width:960px}
 .izgara{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
 .satir{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}

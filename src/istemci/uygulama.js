@@ -141,6 +141,7 @@ function baslik(metin, sag) {
 
 // ---------------- Surum notlari (her yayinda en uste eklenir) ----------------
 const SURUM_NOTLARI = [
+  ['0.8.2', 'Arama ekranı SSSO akışına göre düzeltildi: yetkililer alt alta (görev, e-posta, önceki arama), önceki aramalar görünür, arama nedeni başta, açılır liste yok, numara yanlış / ulaşılamadı / 5 deneme kuralı.'],
   ['0.8.1', 'Aynı ünvanlı müşteriler tek kayıtta toplanır (yüklemede otomatik); mevcut mükerrer kayıtlar için "Mükerrer müşterileri birleştir" düğmesi.'],
   ['0.8.0', 'Arama modülü: arama listeleri ve agent dağıtımı, agent arama ekranı (Yeni / Tekrar / Ulaşılamayan / Tamamlanan), SSSO arama akışı, takvim, arama ayarları.'],
   ['0.7.3', 'Agent ekranı sadece aranacak müşterileri gösterir; "Kendi şifresini değiştir" izni rol bazında yönetilir.'],

@@ -29,12 +29,27 @@ function atamaKosulu(kod, kapsam, kullaniciId, par, musteriAlias) {
   par.push(kullaniciId);
   return ` AND EXISTS (SELECT 1 FROM ${T(kod, 'atamalar')} at1 WHERE at1.musteri_id = ${musteriAlias}.id AND at1.kullanici_id = $${par.length})`;
 }
+// Eski kurulumlarda tohumlanan varsayilanlari kullanici kurallarina getirir (idempotent, surec basina firma basina bir kez).
+// Yalniz hala TOHUM degerinde olan satirlara dokunur; yonetici degistirdiyse korunur.
+const DUZELTILEN = new Set();
+async function firmaDuzelt(q, kod) {
+  if (DUZELTILEN.has(kod)) return;
+  const D = T(kod, 'durumlar');
+  await q(`INSERT INTO ${D} (kod, etiket, dal, kutu, sonuc_grubu, bayraklar, sira, sistem)
+           VALUES ('ulasilamiyor', 'Ulaşılamıyor (görev sonlandırıldı)', 'ulasilamadi', 'tamam', 'ulasilamadi', '{}', 45, true)
+           ON CONFLICT (kod) DO NOTHING`);
+  await q(`UPDATE ${D} SET bayraklar = '{"tekrar_tarihi": "zorunlu"}'::jsonb
+            WHERE kod IN ('telefon_cevap_yok', 'asistan_gecilemedi', 'surekli_mesgul') AND bayraklar = '{}'::jsonb`);
+  await q(`UPDATE ${D} SET kutu = 'tamam', bayraklar = '{}'::jsonb WHERE kod = 'numara_yanlis' AND kutu = 'ulasilamadi'`);
+  await q(`UPDATE ${T(kod, 'ayarlar')} SET deger = '5' WHERE anahtar = 'deneme_limiti' AND deger = '4'`);
+  DUZELTILEN.add(kod);
+}
 async function ayarlariOku(q, kod) {
   const r = await q(`SELECT anahtar, deger FROM ${T(kod, 'ayarlar')}`);
   const a = Object.fromEntries(r.rows.map((x) => [x.anahtar, x.deger]));
   const sayi = (v, vars, en, çok) => { const n = parseInt(v, 10); return Number.isInteger(n) && n >= en && n <= çok ? n : vars; };
   return {
-    deneme_limiti: sayi(a.deneme_limiti, 4, 1, 50),
+    deneme_limiti: sayi(a.deneme_limiti, 5, 1, 50),
     cooldown_gun: sayi(a.cooldown_gun, 30, 0, 365),
     kilit_dakika: sayi(a.kilit_dakika, 15, 1, 240),
   };
@@ -218,11 +233,12 @@ export function aramaRotalari(app) {
   async function yenidenKuyrugaAl(q, kod) {
     // Deneme limiti dolup bekleme suresi gecen "ulasilamadi" kayitlar tekrar Yeni kutusuna doner
     await q(`UPDATE ${T(kod, 'liste_kayitlari')} SET kutu = 'yeni', deneme_sayisi = 0, durum_kodu = NULL, sonuc_grubu = NULL, sonraki_arama = NULL
-              WHERE kutu = 'tamam' AND sonuc_grubu = 'ulasilamadi' AND sonraki_arama IS NOT NULL AND sonraki_arama <= now()`);
+              WHERE kutu = 'tamam' AND sonuc_grubu = 'ulasilamadi' AND durum_kodu = 'ulasilamiyor' AND sonraki_arama IS NOT NULL AND sonraki_arama <= now()`);
   }
 
   app.get('/api/arama/kutular', (c) => firmaIslemi(c, { izin: 'arama_yap' }, async ({ q, k, kod, izinler }) => {
     const kapsam = aramaKapsami(izinler);
+    await firmaDuzelt(q, kod);
     await yenidenKuyrugaAl(q, kod);
     const par = [];
     const ek = atamaKosulu(kod, kapsam, k.id, par, 'm');
@@ -254,7 +270,7 @@ export function aramaRotalari(app) {
     const toplam = await q(`SELECT count(*)::int AS n FROM ${TEMEL_FROM(kod)} WHERE ${kosul}`, par);
     par.push(k.id); const benIx = par.length;
     par.push(ayar.kilit_dakika); const kilitIx = par.length;
-    const sira = kutu === 'tekrar' ? 'lk.sonraki_arama NULLS LAST, m.unvan' : kutu === 'tamam' ? 'lk.son_arama DESC NULLS LAST' : 'lk.oncelik DESC, m.unvan';
+    const sira = (kutu === 'tekrar' || kutu === 'ulasilamadi') ? 'lk.sonraki_arama NULLS LAST, m.unvan' : kutu === 'tamam' ? 'lk.son_arama DESC NULLS LAST' : 'lk.oncelik DESC, m.unvan';
     const r = await q(
       `SELECT lk.id, lk.musteri_id, m.unvan, m.sektor, m.il, m.ilce, m.telefon, m.dis_no, lk.deneme_sayisi, lk.son_arama, lk.sonraki_arama,
               lk.durum_kodu, d.etiket AS durum_etiket, lk.sonuc_grubu, l.ad AS liste_ad, l.id AS liste_id,
@@ -271,6 +287,7 @@ export function aramaRotalari(app) {
   // Arama modali icin tum veri
   app.get('/api/arama/kayit/:id', (c) => firmaIslemi(c, { izin: 'arama_yap' }, async ({ q, k, kod, izinler }) => {
     const kapsam = aramaKapsami(izinler);
+    await firmaDuzelt(q, kod);
     const id = idAl(c);
     const par = [id];
     const ek = atamaKosulu(kod, kapsam, k.id, par, 'm');
@@ -283,12 +300,24 @@ export function aramaRotalari(app) {
     const kontaklar = await q(
       `SELECT id, ad_soyad, gorev, telefon, telefon2, eposta, karar_verici, aranmayacak, aranmayacak_neden
          FROM ${T(kod, 'kontaklar')} WHERE musteri_id = $1 AND NOT silindi ORDER BY karar_verici DESC, ad_soyad`, [kayit.musteri_id]);
+    const kontakArama = await q(
+      `SELECT DISTINCT ON (a.kontak_id) a.kontak_id, a.durum_kodu, d.etiket AS son_etiket, a.baslangic AS son_zaman,
+              (SELECT count(*)::int FROM ${T(kod, 'aramalar')} x WHERE x.kontak_id = a.kontak_id AND x.kayit_durumu = 'tamamlandi') AS adet
+         FROM ${T(kod, 'aramalar')} a LEFT JOIN ${T(kod, 'durumlar')} d ON d.kod = a.durum_kodu
+        WHERE a.musteri_id = $1 AND a.kontak_id IS NOT NULL AND a.kayit_durumu = 'tamamlandi'
+        ORDER BY a.kontak_id, a.baslangic DESC`, [kayit.musteri_id]);
+    const kaMap = Object.fromEntries(kontakArama.rows.map((x) => [x.kontak_id, x]));
+    kontaklar.rows.forEach((x) => {
+      const ka = kaMap[x.id];
+      x.arama_adet = ka ? ka.adet : 0; x.son_sonuc = ka ? ka.son_etiket : null; x.son_zaman = ka ? ka.son_zaman : null;
+      x.numara_yanlis = !!(ka && ka.durum_kodu === 'numara_yanlis');
+    });
     const gecmis = await q(
       `SELECT a.baslangic, a.kullanici_adi, a.deneme_no, a.ulasildi, a.not_metni, a.sonraki_arama, a.randevu_zamani,
-              d.etiket AS durum_etiket, kt.ad_soyad AS kontak_ad, a.liste_adi
+              d.etiket AS durum_etiket, kt.ad_soyad AS kontak_ad, kt.gorev AS kontak_gorev, a.liste_adi
          FROM ${T(kod, 'aramalar')} a LEFT JOIN ${T(kod, 'durumlar')} d ON d.kod = a.durum_kodu
          LEFT JOIN ${T(kod, 'kontaklar')} kt ON kt.id = a.kontak_id
-        WHERE a.musteri_id = $1 AND a.kayit_durumu = 'tamamlandi' ORDER BY a.baslangic DESC LIMIT 20`, [kayit.musteri_id]);
+        WHERE a.musteri_id = $1 AND a.kayit_durumu = 'tamamlandi' ORDER BY a.baslangic DESC LIMIT 30`, [kayit.musteri_id]);
     const yasakli = await q(`SELECT 1 FROM ${T(kod, 'yasakli_liste')} WHERE musteri_id = $1 AND kapsam = 'musteri' AND kaldirma_zamani IS NULL`, [kayit.musteri_id]);
     const durumlar = await q(`SELECT kod, etiket, dal, ust_kod, alt_soru, kutu, sonuc_grubu, bayraklar, sira FROM ${T(kod, 'durumlar')} WHERE aktif ORDER BY sira, kod`);
     const sec = await q(`SELECT tur, kod, etiket FROM ${T(kod, 'secenekler')} WHERE aktif ORDER BY tur, sira, kod`);
@@ -331,12 +360,20 @@ export function aramaRotalari(app) {
       if (kt.rows[0].aranmayacak) throw new HttpHata(409, 'Bu yetkili aranmak istemiyor olarak işaretli.');
       kontakId = g.kontak_id;
     }
+    // Arama nedeni: arama BASLARKEN secilir
+    let nedenKodu = null;
+    const nedenler = await q(`SELECT kod FROM ${T(kod, 'secenekler')} WHERE tur = 'gorusme_nedeni' AND aktif`);
+    if (nedenler.rows.length) {
+      const n = norm(g.neden_kodu);
+      if (!nedenler.rows.some((x) => x.kod === n)) throw new HttpHata(400, 'Arama nedenini seçin.');
+      nedenKodu = n;
+    }
     // Eski acik (yarim kalmis) aramalarim: tek acik arama kalsin
     await q(`DELETE FROM ${T(kod, 'aramalar')} WHERE liste_kayit_id = $1 AND kayit_durumu = 'acik' AND (kullanici_id = $2 OR baslangic < now() - interval '3 hours')`, [kayit.id, k.id]);
     const ar = await q(
-      `INSERT INTO ${T(kod, 'aramalar')} (musteri_id, kontak_id, kullanici_id, kullanici_adi, liste_id, liste_kayit_id, liste_adi, deneme_no)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, baslangic`,
-      [kayit.musteri_id, kontakId, k.id, k.kullanici_adi, kayit.liste_id, kayit.id, kayit.liste_adi || kayit.liste_ad, kayit.deneme_sayisi + 1]);
+      `INSERT INTO ${T(kod, 'aramalar')} (musteri_id, kontak_id, kullanici_id, kullanici_adi, liste_id, liste_kayit_id, liste_adi, deneme_no, neden_kodu)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, baslangic`,
+      [kayit.musteri_id, kontakId, k.id, k.kullanici_adi, kayit.liste_id, kayit.id, kayit.liste_adi || kayit.liste_ad, kayit.deneme_sayisi + 1, nedenKodu]);
     await q(`UPDATE ${T(kod, 'liste_kayitlari')} SET kilit_kullanici_id = $2, kilit_zaman = now() WHERE id = $1`, [kayit.id, k.id]);
     return { durum: 'ok', arama_id: ar.rows[0].id, baslangic: ar.rows[0].baslangic };
   }));
@@ -362,12 +399,21 @@ export function aramaRotalari(app) {
     const lk = lkR.rows[0];
     if (!lk) throw new HttpHata(409, 'Liste kaydı bulunamadı.');
     const ayar = await ayarlariOku(q, kod);
-    const dKod = norm(g.durum_kodu);
+    let dKod = norm(g.durum_kodu);
     if (!KOD_RE.test(dKod)) throw new HttpHata(400, 'Sonuç seçin.');
-    const dr = await q(`SELECT * FROM ${T(kod, 'durumlar')} WHERE kod = $1 AND aktif`, [dKod]);
-    const durum = dr.rows[0];
+    let dr = await q(`SELECT * FROM ${T(kod, 'durumlar')} WHERE kod = $1 AND aktif`, [dKod]);
+    let durum = dr.rows[0];
     if (!durum) throw new HttpHata(400, 'Geçersiz sonuç.');
+    const limit0 = lk.deneme_limiti || ayar.deneme_limiti;
+    const sonDeneme = durum.dal === 'ulasilamadi' && durum.kod !== 'numara_yanlis' && (lk.deneme_sayisi + 1) >= limit0;
+    let ekOrijinal = null;
+    if (sonDeneme && durum.kod !== 'ulasilamiyor') {
+      // Deneme limiti doldu: gorev sonlandirilir (Ulasilamiyor)
+      const son = await q(`SELECT * FROM ${T(kod, 'durumlar')} WHERE kod = 'ulasilamiyor'`);
+      if (son.rows[0]) { ekOrijinal = durum.kod; durum = son.rows[0]; dKod = durum.kod; }
+    }
     const bay = durum.bayraklar || {};
+    const gercekBay = ekOrijinal ? ((dr.rows[0] && dr.rows[0].bayraklar) || {}) : bay;
     const not = kisalt(g.not_metni, 2000);
     if (bay.metin_zorunlu && !not) throw new HttpHata(400, 'Bu sonuç için açıklama (not) zorunludur.');
 
@@ -389,7 +435,7 @@ export function aramaRotalari(app) {
 
     // Tarihler
     const tekrar = tarihOku(g.tekrar_tarihi, 'Tekrar arama tarihi');
-    if (bay.tekrar_tarihi === 'zorunlu' && !tekrar) throw new HttpHata(400, 'Tekrar arama tarihi zorunludur.');
+    if (gercekBay.tekrar_tarihi === 'zorunlu' && !tekrar && !ekOrijinal) throw new HttpHata(400, 'Tekrar arama tarihi zorunludur.');
     let randevu = null;
     if (bay.randevu) { randevu = tarihOku(g.randevu_zamani, 'Randevu zamanı'); if (!randevu) throw new HttpHata(400, 'Randevu zamanı zorunludur.'); }
 
@@ -406,9 +452,7 @@ export function aramaRotalari(app) {
       if (g.ilgi_seviyesi !== undefined && g.ilgi_seviyesi !== null && g.ilgi_seviyesi !== '') { ilgi = Number(g.ilgi_seviyesi); if (!Number.isInteger(ilgi) || ilgi < 1 || ilgi > 5) throw new HttpHata(400, 'İlgi seviyesi 1-5 olmalı.'); }
       if (g.rakip_sozlesme_bitis) { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(g.rakip_sozlesme_bitis))) throw new HttpHata(400, 'Rakip sözleşme bitiş tarihi geçersiz.'); rakip = g.rakip_sozlesme_bitis; }
     }
-    let nedenKodu = null; let kanal = 'telefon';
-    if (g.neden_kodu) { const n = norm(g.neden_kodu); const x = await q(`SELECT 1 FROM ${T(kod, 'secenekler')} WHERE tur = 'gorusme_nedeni' AND kod = $1 AND aktif`, [n]); if (x.rows[0]) nedenKodu = n; }
-    if (g.kanal_kodu) { const n = norm(g.kanal_kodu); const x = await q(`SELECT 1 FROM ${T(kod, 'secenekler')} WHERE tur = 'kanal' AND kod = $1 AND aktif`, [n]); if (x.rows[0]) kanal = n; }
+    const nedenKodu = arama.neden_kodu || null; const kanal = arama.kanal_kodu || 'telefon';
 
     // Yan kayitlar
     let takvimId = null;
@@ -440,15 +484,18 @@ export function aramaRotalari(app) {
     // Liste kaydi: kutu / deneme / sonraki arama
     const yeniDeneme = lk.deneme_sayisi + 1;
     const limit = lk.deneme_limiti || ayar.deneme_limiti;
-    let kutu = durum.kutu; let sonraki = (kutu === 'tekrar') ? tekrar : null;
+    let kutu = durum.kutu; let sonraki = (kutu === 'tekrar' || kutu === 'ulasilamadi') ? tekrar : null;
     if (musteriKapali) kutu = 'tamam';
-    if (durum.dal === 'ulasilamadi' && !musteriKapali && yeniDeneme >= limit) {
+    if (durum.kod === 'ulasilamiyor') {
       kutu = 'tamam';
-      sonraki = new Date(Date.now() + ayar.cooldown_gun * 86400000).toISOString();
+      sonraki = ayar.cooldown_gun > 0 ? new Date(Date.now() + ayar.cooldown_gun * 86400000).toISOString() : null;
+    } else if (durum.dal === 'ulasilamadi' && durum.kod !== 'numara_yanlis' && !musteriKapali && yeniDeneme >= limit) {
+      kutu = 'tamam'; sonraki = null;
     }
     const ulasildi = durum.dal === 'ulasilamadi' ? false : (durum.dal === 'aramasiz' ? null : true);
     const muhatap = durum.dal === 'muhatap_degil' ? false : ((durum.dal === 'uygun_degil' || durum.dal === 'bilgi_verildi') ? true : null);
     const ekVeri = {};
+    if (ekOrijinal) ekVeri.asil_sonuc = ekOrijinal;
     if (kisalt(g.alt_cevap, 300)) ekVeri.alt_cevap = kisalt(g.alt_cevap, 300);
     if (kisalt(g.aranan_telefon, 30)) ekVeri.aranan_telefon = kisalt(g.aranan_telefon, 30);
     await q(`UPDATE ${T(kod, 'liste_kayitlari')} SET durum_kodu = $2, kutu = $3, sonuc_grubu = $4, deneme_sayisi = $5, son_arama = now(),
