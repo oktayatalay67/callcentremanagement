@@ -1,0 +1,10 @@
+# v0.4.0 - Cloudflare Workers ayari (yalnizca Cloudflare'de calisirken gerekir)
+# CANLI : npx wrangler deploy              -> cc-platform
+# TEST  : npx wrangler deploy --env test   -> cc-platform-test (ayri Worker, ayri gizli degiskenler)
+name = "cc-platform"
+main = "src/worker.js"
+compatibility_date = "2025-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[env.test]
+name = "cc-platform-test"
