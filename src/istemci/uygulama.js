@@ -2,6 +2,13 @@
 let ben = null;
 let icerik = null;
 
+function temaUygula(r) {
+  const st = document.documentElement.style;
+  const ayar = (ad, v) => { if (v) st.setProperty(ad, v); else st.removeProperty(ad); };
+  ayar('--ana', r && r.ana);
+  ayar('--vurgu', r && r.vurgu);
+}
+
 window.oturumDustu = function () { if (ben) { ben = null; girisEkrani(); } };
 
 function eylemVar(ad) { return !!ben && ben.izinler.eylem.indexOf(ad) >= 0; }
@@ -24,6 +31,7 @@ function girisEkrani() {
       if (s.ok) { location.hash = '#/ana'; yenile(); } else mesaj(kutu, 'hata', hataMetni(s, 'Giriş başarısız.'));
     });
   });
+  temaUygula(null);
   kok.className = '';
   kok.innerHTML = '';
   kok.appendChild(el('div', { 'class': 'kart' }, [
@@ -87,7 +95,7 @@ window.addEventListener('hashchange', yonlendir);
 function yenile() {
   api('/api/ben').then((s) => {
     if (!s.ok) { ben = null; girisEkrani(); return; }
-    ben = s.j; kabuk(); yonlendir();
+    ben = s.j; temaUygula(ben.renkler); kabuk(); yonlendir();
   });
 }
 
@@ -151,7 +159,7 @@ function sayfaProfil() {
     const lkutu = el('div', { style: 'display:none' });
     const dosya = el('input', { type: 'file', id: 'f_logo_dosya', accept: 'image/png,image/jpeg' });
     const onizleme = f.logo_var ? el('img', { src: '/api/firma/logo?t=' + Date.now(), alt: 'Logo' }) : el('span', { 'class': 'alt', metin: 'Logo yüklenmemiş' });
-    const logoPanel = [el('h2', { metin: 'Logo' }), el('div', { 'class': 'logokutu' }, [onizleme])];
+    const logoPanel = [el('h2', { metin: 'Logo ve renkler' }), el('p', { 'class': 'alt', metin: 'Logo' }), el('div', { 'class': 'logokutu' }, [onizleme])];
     if (duzenle) {
       const yukle = el('button', { type: 'button', metin: 'Logoyu yükle' });
       yukle.addEventListener('click', () => {
@@ -181,7 +189,58 @@ function sayfaProfil() {
       logoPanel.push(el('div', { 'class': 'satir' }, [dosya, yukle, kaldir]));
     }
     logoPanel.push(lkutu);
+
+    // Renkler (opsiyonel): isaretlenmezse platformun varsayilan rengi kullanilir
+    const rkutu = el('div', { style: 'display:none' });
+    const onizle = el('div', { 'class': 'satir', style: 'margin:6px 0 0' });
+    function renkSatiri(etiket, ad, mevcut, ilk, aciklama) {
+      const onay = el('input', { type: 'checkbox', id: 'f_' + ad + '_ozel', disabled: !duzenle });
+      onay.checked = !!mevcut;
+      const sec = el('input', { type: 'color', id: 'f_' + ad, value: (mevcut || ilk).toLowerCase(), disabled: !duzenle || !mevcut });
+      const yazi = el('span', { 'class': 'alt', style: 'margin:0', metin: mevcut || 'Varsayılan renk' });
+      const guncelle = () => {
+        sec.disabled = !duzenle || !onay.checked;
+        yazi.textContent = onay.checked ? sec.value.toUpperCase() : 'Varsayılan renk';
+        onizleCiz();
+      };
+      onay.addEventListener('change', guncelle);
+      sec.addEventListener('input', guncelle);
+      return el('div', { 'class': 'renk' }, [
+        el('span', { 'class': 'ad', metin: etiket }),
+        el('label', { style: 'margin:0;display:flex;align-items:center;gap:6px;font-weight:400' }, [onay, 'Özel renk kullan']),
+        sec, yazi, el('span', { 'class': 'alt', style: 'margin:0', metin: aciklama }),
+      ]);
+    }
+    function renkDegeri(ad) {
+      return document.getElementById('f_' + ad + '_ozel').checked ? document.getElementById('f_' + ad).value.toUpperCase() : null;
+    }
+    function onizleCiz() {
+      onizle.innerHTML = '';
+      const ana = renkDegeri('renk_ana') || '#2F6FDB';
+      const vurgu = renkDegeri('renk_vurgu') || '#DDE3EA';
+      onizle.appendChild(el('span', { 'class': 'alt', style: 'margin:0', metin: 'Önizleme:' }));
+      onizle.appendChild(el('span', { style: 'background:' + ana + ';color:#fff;padding:6px 12px;border-radius:6px;font-weight:600', metin: 'Örnek düğme' }));
+      onizle.appendChild(el('span', { style: 'display:inline-block;width:80px;border-bottom:3px solid ' + vurgu }));
+    }
+    logoPanel.push(el('h2', { metin: 'Renkler (isteğe bağlı)', style: 'margin-top:22px' }));
+    logoPanel.push(el('p', { 'class': 'alt', metin: 'İşaretlemezseniz platformun varsayılan renkleri kullanılır. Ana renk üzerinde beyaz yazı okunabilmelidir.' }));
+    logoPanel.push(renkSatiri('Ana renk', 'renk_ana', f.renk_ana, '#2A4B9B', 'Düğmeler, aktif menü, bağlantılar'));
+    logoPanel.push(renkSatiri('Vurgu rengi', 'renk_vurgu', f.renk_vurgu, '#E33279', 'Üst çubuğun alt çizgisi'));
+    logoPanel.push(onizle);
+    if (duzenle) {
+      const rkaydet = el('button', { type: 'button', metin: 'Renkleri kaydet' });
+      rkaydet.addEventListener('click', () => {
+        mesaj(rkutu, '', ''); rkaydet.disabled = true;
+        api('/api/firma/renkler', { renk_ana: renkDegeri('renk_ana'), renk_vurgu: renkDegeri('renk_vurgu') }, 'PUT').then((r) => {
+          rkaydet.disabled = false;
+          if (r.ok) { ben.renkler = r.j.renkler; temaUygula(ben.renkler); mesaj(rkutu, 'basari', hataMetni(r)); } else mesaj(rkutu, 'hata', hataMetni(r));
+        });
+      });
+      logoPanel.push(el('div', { 'class': 'satir' }, [rkaydet]));
+    }
+    logoPanel.push(rkutu);
     alanAdi.appendChild(panel(logoPanel));
+    onizleCiz();
   });
 }
 

@@ -6,13 +6,14 @@ import { getCookie, setCookie } from 'hono/cookie';
 import { veritabani } from './db.js';
 import { VARSAYILAN_TEKRAR, jetonImzala, jetonDogrula } from './guvenlik.js';
 
-export const SURUM = '0.5.0';
+export const SURUM = '0.5.1';
 export const COOKIE = 'oturum';
 export const OTURUM_SURE_SN = 12 * 3600;
 
 export const FIRMA_KOD_RE = /^[a-z0-9]{1,20}$/;
 export const KULLANICI_RE = /^[a-z0-9._@-]{2,60}$/;
 export const ROL_KOD_RE = /^[a-z0-9_]{1,30}$/;
+export const RENK_RE = /^#[0-9a-fA-F]{6}$/;
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export const norm = (v) => String(v == null ? '' : v).trim().toLowerCase().slice(0, 100);
@@ -88,4 +89,14 @@ export async function oturumBaslat(c, kullaniciId, surum) {
   setCookie(c, COOKIE, jeton, {
     httpOnly: true, secure: httpsMi(c), sameSite: 'Strict', path: '/', maxAge: OTURUM_SURE_SN,
   });
+}
+
+// Beyaz yaziyla kontrast orani (WCAG): 4.5 ve ustu okunabilir sayilir.
+export function kontrastBeyaz(hex) {
+  const kanal = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  const L = 0.2126 * kanal[0] + 0.7152 * kanal[1] + 0.0722 * kanal[2];
+  return 1.05 / (L + 0.05);
 }

@@ -1,9 +1,9 @@
 {
   "name": "cc-platform",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
-  "description": "Cok firmali cold-call platformu - Adim 5: firma yonetici ekrani",
+  "description": "Cok firmali cold-call platformu - Adim 5.1: firma renkleri",
   "scripts": {
     "node": "node src/node.js",
     "istemci": "node scripts/istemci-uret.mjs",

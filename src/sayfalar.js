@@ -5,6 +5,7 @@
 // betikler /app.js ve /kurulum.js olarak ayri sunulur.
 // =====================================================================
 const STIL = `
+:root{--ana:#2f6fdb;--vurgu:#dde3ea}
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f3f5f8;color:#1c2430;font-size:14px}
 main{max-width:420px;margin:8vh auto;padding:0 16px}
@@ -15,21 +16,21 @@ h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:0 0 12px}
 label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
 input,select,textarea{width:100%;padding:9px 11px;font-size:14px;border:1px solid #b9c4d0;border-radius:6px;background:#fff;font-family:inherit}
 input[type=checkbox]{width:auto}
-input:focus,select:focus,textarea:focus{outline:2px solid #2f6fdb;border-color:#2f6fdb}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ana);border-color:var(--ana)}
 input:disabled,select:disabled{background:#eef1f5;color:#5c6b7d}
-button{padding:9px 14px;font-size:14px;font-weight:600;color:#fff;background:#2f6fdb;border:0;border-radius:6px;cursor:pointer}
+button{padding:9px 14px;font-size:14px;font-weight:600;color:#fff;background:var(--ana);border:0;border-radius:6px;cursor:pointer}
 button:disabled{opacity:.6;cursor:wait}
 button.tam{width:100%;margin-top:20px;padding:11px;font-size:15px}
-button.ikincil{background:#fff;color:#2f6fdb;border:1px solid #2f6fdb}
+button.ikincil{background:#fff;color:var(--ana);border:1px solid var(--ana)}
 button.tehlike{background:#b42318}
 button.kucuk{padding:5px 9px;font-size:12px}
 .hata{margin-top:14px;padding:10px 12px;background:#fdecea;color:#8a1c14;border-radius:6px;font-size:14px}
 .basari{margin-top:14px;padding:10px 12px;background:#e6f4ea;color:#14532d;border-radius:6px;font-size:14px}
 dl{margin:16px 0 0;font-size:14px}dt{color:#5c6b7d;font-size:12px;margin-top:10px}dd{margin:2px 0 0;font-weight:600}
 .surum{text-align:center;color:#8a96a5;font-size:12px;margin-top:14px}
-a{color:#2f6fdb}
+a{color:var(--ana)}
 /* uygulama kabugu */
-.ust{display:flex;align-items:center;gap:14px;background:#fff;border-bottom:1px solid #dde3ea;padding:10px 20px;height:58px}
+.ust{display:flex;align-items:center;gap:14px;background:#fff;border-bottom:3px solid var(--vurgu);padding:10px 20px;height:58px}
 .ust .logo{height:36px;max-width:140px;object-fit:contain}
 .ust .firma{font-weight:700;font-size:16px}
 .ust .bosluk{flex:1}
@@ -37,8 +38,8 @@ a{color:#2f6fdb}
 .govde{display:flex;min-height:calc(100vh - 58px)}
 .menu{width:210px;background:#fff;border-right:1px solid #dde3ea;padding:14px 10px}
 .menu a{display:block;padding:9px 12px;margin-bottom:2px;border-radius:6px;color:#1c2430;text-decoration:none;font-weight:600}
-.menu a:hover{background:#eef3fb}
-.menu a.aktif{background:#2f6fdb;color:#fff}
+.menu a:hover{background:color-mix(in srgb, var(--ana) 9%, #fff)}
+.menu a.aktif{background:var(--ana);color:#fff}
 .icerik{flex:1;padding:24px;min-width:0}
 .panel{background:#fff;border:1px solid #dde3ea;border-radius:10px;padding:20px;margin-bottom:18px;max-width:960px}
 .izgara{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
@@ -51,10 +52,11 @@ tr.pasif td{color:#8a96a5}
 .rozet.yesil{background:#e6f4ea;color:#14532d}.rozet.gri{background:#eef1f5;color:#5c6b7d}
 .iki{display:grid;grid-template-columns:240px 1fr;gap:18px;max-width:1100px}
 .rol{padding:10px 12px;border:1px solid #dde3ea;border-radius:8px;margin-bottom:8px;cursor:pointer;background:#fff}
-.rol.secili{border-color:#2f6fdb;background:#eef3fb}
+.rol.secili{border-color:var(--ana);background:color-mix(in srgb, var(--ana) 9%, #fff)}
 .izin{display:flex;align-items:center;gap:8px;padding:5px 0}
 .izin input{margin:0}.izin label{margin:0;font-weight:400}
 .logokutu{display:flex;align-items:center;gap:16px;margin:8px 0}
+.renk{display:flex;align-items:center;gap:12px;margin:10px 0;flex-wrap:wrap}.renk input[type=color]{width:46px;height:34px;padding:2px;cursor:pointer}.renk .ad{min-width:120px;font-weight:600}
 .logokutu img{max-height:64px;max-width:200px;border:1px solid #dde3ea;border-radius:6px;padding:4px;background:#fff}
 @media(max-width:800px){.izgara,.iki{grid-template-columns:1fr}.menu{width:150px}}
 `;

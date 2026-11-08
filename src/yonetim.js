@@ -13,7 +13,7 @@ import {
 } from './izinler.js';
 import {
   T, HttpHata, hata, jsonGovde, norm, metin, oturumAl, oturumBaslat, tekrarSayisi,
-  KULLANICI_RE, ROL_KOD_RE, UUID_RE,
+  KULLANICI_RE, ROL_KOD_RE, UUID_RE, RENK_RE, kontrastBeyaz,
 } from './yardimci.js';
 
 const LOGO_MAX = 204800;
@@ -71,15 +71,15 @@ export function yonetimRotalari(app) {
     const temel = {
       durum: 'ok', id: k.id, kullanici_adi: k.kullanici_adi, ad_soyad: k.ad_soyad, rol_kod: k.rol_kod,
       platform: k.firma_id === null, firma_kod: k.firma_kod, firma_unvan: k.firma_unvan,
-      izinler: { kapsam: {}, eylem: [] }, logo_var: false,
+      izinler: { kapsam: {}, eylem: [] }, logo_var: false, renkler: { ana: null, vurgu: null },
     };
     if (k.firma_id === null) return c.json(temel);
     const db = veritabani(c.env.DATABASE_URL);
     return c.json(await db.baglanti(async (q) => {
       const iz = await izinleriYukle(q, k.firma_kod, k.rol_kod);
-      const f = await q(`SELECT (logo IS NOT NULL) AS logo_var FROM cc.firmalar WHERE id = $1`, [k.firma_id]);
+      const f = await q(`SELECT (logo IS NOT NULL) AS logo_var, renk_ana, renk_vurgu FROM cc.firmalar WHERE id = $1`, [k.firma_id]);
       const rl = await q(`SELECT gorunen_ad FROM ${T(k.firma_kod, 'roller')} WHERE kod = $1`, [k.rol_kod]);
-      return { ...temel, rol_ad: rl.rows[0] ? rl.rows[0].gorunen_ad : k.rol_kod, izinler: { kapsam: iz.kapsam, eylem: [...iz.eylem] }, logo_var: !!(f.rows[0] && f.rows[0].logo_var) };
+      return { ...temel, rol_ad: rl.rows[0] ? rl.rows[0].gorunen_ad : k.rol_kod, izinler: { kapsam: iz.kapsam, eylem: [...iz.eylem] }, logo_var: !!(f.rows[0] && f.rows[0].logo_var), renkler: { ana: f.rows[0] ? f.rows[0].renk_ana : null, vurgu: f.rows[0] ? f.rows[0].renk_vurgu : null } };
     }));
   });
 
@@ -109,7 +109,7 @@ export function yonetimRotalari(app) {
 
   // ---------------- Firma profili ----------------
   app.get('/api/firma', (c) => firmaIslemi(c, {}, async ({ q, k }) => {
-    const r = await q(`SELECT kod, unvan, kisa_ad, adres, telefon, eposta, web, vergi_no,
+    const r = await q(`SELECT kod, unvan, kisa_ad, adres, telefon, eposta, web, vergi_no, renk_ana, renk_vurgu,
                               (logo IS NOT NULL) AS logo_var FROM cc.firmalar WHERE id = $1`, [k.firma_id]);
     return { durum: 'ok', firma: r.rows[0] };
   }));
@@ -134,6 +134,26 @@ export function yonetimRotalari(app) {
         [k.firma_id, unvan, kisa, adres, tel, eposta, web, vergi]);
       await gunluk(q, kod, k.id, 'firma_profil_guncelle', 'firma', k.firma_id, {});
       return { durum: 'ok', mesaj: 'Firma bilgileri kaydedildi.' };
+    });
+  });
+
+  app.put('/api/firma/renkler', async (c) => {
+    const g = await jsonGovde(c);
+    if (!g) return hata(c, 400, 'Geçersiz istek.');
+    return firmaIslemi(c, { izin: 'firma_profil_duzenle', islemli: true }, async ({ q, k, kod }) => {
+      const oku = (v) => (v === null || v === undefined || v === '' ? null : String(v).trim());
+      let ana = oku(g.renk_ana);
+      let vurgu = oku(g.renk_vurgu);
+      if (ana !== null && !RENK_RE.test(ana)) throw new HttpHata(400, 'Ana renk #RRGGBB biçiminde olmalı.');
+      if (vurgu !== null && !RENK_RE.test(vurgu)) throw new HttpHata(400, 'Vurgu rengi #RRGGBB biçiminde olmalı.');
+      if (ana !== null) ana = ana.toUpperCase();
+      if (vurgu !== null) vurgu = vurgu.toUpperCase();
+      if (ana !== null && kontrastBeyaz(ana) < 4.5) {
+        throw new HttpHata(400, 'Ana renk beyaz yazıyla yeterince kontrast oluşturmuyor. Daha koyu bir renk seçin.');
+      }
+      await q(`UPDATE cc.firmalar SET renk_ana = $2, renk_vurgu = $3 WHERE id = $1`, [k.firma_id, ana, vurgu]);
+      await gunluk(q, kod, k.id, 'renk_guncelle', 'firma', k.firma_id, { ana, vurgu });
+      return { durum: 'ok', mesaj: 'Renkler kaydedildi.', renkler: { ana, vurgu } };
     });
   });
 
