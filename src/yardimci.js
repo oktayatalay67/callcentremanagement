@@ -6,7 +6,7 @@ import { getCookie, setCookie } from 'hono/cookie';
 import { veritabani } from './db.js';
 import { VARSAYILAN_TEKRAR, jetonImzala, jetonDogrula } from './guvenlik.js';
 
-export const SURUM = '0.9.0';
+export const SURUM = '0.9.1';
 export const COOKIE = 'oturum';
 export const OTURUM_SURE_SN = 12 * 3600;
 

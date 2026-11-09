@@ -80,7 +80,7 @@ function aramaModal(kayitId, kapaninca) {
   arka.appendChild(kutu);
   document.body.appendChild(arka);
   let veri = null; let aramaId = null; let kapali = false;
-  const s = { kontak_id: '', neden: '', ulasildi: null, dogru: null, uygun: null, durum: null, ulasilamadiNedeni: null };
+  const s = { kontak_id: '', neden: '', ulasildi: null, dogru: null, grup: null, durum: null, ulasilamadiNedeni: null, grup: null };
 
   function kapat(yenile2) { if (kapali) return; kapali = true; arka.remove(); if (kapaninca) kapaninca(yenile2); }
   function iptalEt() {
@@ -205,7 +205,7 @@ function aramaModal(kayitId, kapaninca) {
     kutu.appendChild(el('div', { 'class': 'alt', style: 'margin:8px 0 0', metin: 'Arama nedeni: ' + (nedenEtiket() || '-') + ' · Aranan: ' + (kt ? kt.ad_soyad + (kt.gorev ? ' (' + kt.gorev + ')' : '') : 'Firma telefonu') }));
     kutu.appendChild(telKutusu());
     const ikili = (metin, deg, ev, ha) => chipSatir(metin, [['e', 'Evet'], ['h', 'Hayır']], deg === true ? 'e' : (deg === false ? 'h' : ''), (v) => (v === 'e' ? ev() : ha()));
-    kutu.appendChild(ikili('Ulaşıldı mı?', s.ulasildi, () => { s.ulasildi = true; s.dogru = null; s.uygun = null; s.durum = null; ciz(); }, () => { s.ulasildi = false; s.dogru = null; s.uygun = null; s.durum = null; ciz(); }));
+    kutu.appendChild(ikili('Ulaşıldı mı?', s.ulasildi, () => { s.ulasildi = true; s.dogru = null; s.grup = null; s.durum = null; ciz(); }, () => { s.ulasildi = false; s.dogru = null; s.grup = null; s.durum = null; ciz(); }));
     let dal = null; let ozelKaydet = null;
     const tekrarAlani = (zorunlu) => el('div', null, [el('label', { 'for': 'f_md_tekrar', metin: 'Tekrar arama tarihi' + (zorunlu ? ' (zorunlu)' : ' (isteğe bağlı)') }), el('input', { type: 'datetime-local', id: 'f_md_tekrar' })]);
     const ekPaneller = [];
@@ -216,7 +216,7 @@ function aramaModal(kayitId, kapaninca) {
       if (s.durum === 'numara_yanlis') {
         ekPaneller.push(el('div', { 'class': 'bant', style: 'display:block', metin: 'Numara yanlış: seçili yetkili "numarası yanlış, ulaşılamadı" olarak işaretlenir ve görev sonlandırılır.' }));
         ozelKaydet = 'Görevi sonlandır — numara yanlış';
-      } else if (s.durum) {
+      } else if (s.durum && (veri.durumlar.find((x) => x.kod === s.durum) || {}).dal === 'ulasilamadi') {
         if (sonDeneme) {
           ekPaneller.push(el('div', { 'class': 'bant', style: 'display:block', metin: 'Bu ' + limit() + '. deneme. Kaydedince görev "Ulaşılamıyor" olarak sonlandırılır.' }));
           ozelKaydet = 'Ulaşılamıyor — görevi sonlandır';
@@ -228,20 +228,23 @@ function aramaModal(kayitId, kapaninca) {
       }
     }
     if (s.ulasildi === true) {
-      kutu.appendChild(ikili('Doğru kişiye mi ulaşıldı?', s.dogru, () => { s.dogru = true; s.uygun = null; s.durum = null; ciz(); }, () => { s.dogru = false; s.uygun = null; s.durum = null; ciz(); }));
+      kutu.appendChild(ikili('Doğru kişiye mi ulaşıldı?', s.dogru, () => { s.dogru = true; s.grup = null; s.durum = null; ciz(); }, () => { s.dogru = false; s.grup = null; s.durum = null; ciz(); }));
       if (s.dogru === false) { dal = 'muhatap_degil'; kutu.appendChild(durumChipleri('muhatap_degil', 'Ne oldu?')); }
       if (s.dogru === true) {
         const ic = veri.icerikler;
         const parca = (tur, ad) => { const x = ic.filter((i) => i.tur === tur); if (!x.length) return null; return el('details', { open: tur === 'script' ? 'open' : null }, [el('summary', { metin: ad }), el('div', { 'class': 'metin', metin: x.map((i) => (i.baslik ? i.baslik + '\n' : '') + i.metin).join('\n\n') })]); };
         if (veri.kayit.konusma_metni) kutu.appendChild(el('details', { open: 'open' }, [el('summary', { metin: 'Liste konuşma metni' }), el('div', { 'class': 'metin', metin: veri.kayit.konusma_metni })]));
         [parca('script', 'Konuşma metni'), parca('ipucu', 'İpuçları'), parca('rehber_notu', 'Rehber notu')].forEach((p) => { if (p) kutu.appendChild(p); });
-        kutu.appendChild(ikili('Görüşmek için uygun mu?', s.uygun, () => { s.uygun = true; s.durum = null; ciz(); }, () => { s.uygun = false; s.durum = null; ciz(); }));
-        if (s.uygun === false) { dal = 'uygun_degil'; kutu.appendChild(durumChipleri('uygun_degil', 'Sonuç')); }
-        if (s.uygun === true) { dal = 'bilgi_verildi'; kutu.appendChild(durumChipleri('bilgi_verildi', 'Görüşme sonucu')); }
+        const GRUP = [['olumlu', 'Olumlu'], ['olumsuz', 'Olumsuz'], ['beklemede', 'Belirsiz']];
+        kutu.appendChild(chipSatir('Görüşme sonucu', GRUP, s.grup, (v) => { s.grup = v; s.durum = null; ciz(); }));
+        if (s.grup) {
+          const l = veri.durumlar.filter((x) => (x.dal === 'bilgi_verildi' || x.dal === 'uygun_degil') && x.sonuc_grubu === s.grup);
+          kutu.appendChild(chipSatir('Ne oldu?', l.map((x) => [x.kod, x.etiket]), s.durum, (k2) => { s.durum = k2; ciz(); }));
+        }
       }
     }
     const asiz = veri.durumlar.filter((d) => d.dal === 'aramasiz');
-    if (asiz.length) kutu.appendChild(el('details', null, [el('summary', { metin: 'Aramasız kapat' }), chipSatir('Neden', asiz.map((d) => [d.kod, d.etiket]), s.durum, (k2) => { s.durum = k2; dal = 'aramasiz'; ciz(); })]));
+    if (asiz.length) kutu.appendChild(el('details', { open: (s.durum && (veri.durumlar.find((x) => x.kod === s.durum) || {}).dal === 'aramasiz') ? 'open' : null }, [el('summary', { metin: 'Aramasız kapat' }), chipSatir('Neden', asiz.map((d) => [d.kod, d.etiket]), s.durum, (k2) => { s.durum = k2; s.ulasildi = null; s.dogru = null; s.grup = null; dal = 'aramasiz'; ciz(); })]));
     const d = veri.durumlar.find((x) => x.kod === s.durum);
     const hata = el('div', { style: 'display:none' });
     if (d) {
@@ -252,15 +255,13 @@ function aramaModal(kayitId, kapaninca) {
       if (d.dal !== 'ulasilamadi' && b.tekrar_tarihi) alanlar.push(tekrarAlani(b.tekrar_tarihi === 'zorunlu'));
       if (b.randevu) alanlar.push(el('div', null, [el('label', { 'for': 'f_md_randevu', metin: 'Randevu zamanı (zorunlu)' }), el('input', { type: 'datetime-local', id: 'f_md_randevu' })]));
       if (b.yeni_kontak) alanlar.push(el('div', { 'class': 'soru' }, [el('div', { style: 'font-weight:600', metin: d.dal === 'muhatap_degil' ? 'Doğru kişinin bilgileri (biliyorsanız)' : 'Yeni yetkili' }), el('div', { 'class': 'izgara' }, [alan('Ad soyad', 'md_yk_ad'), alan('Görev', 'md_yk_gorev'), alan('Telefon', 'md_yk_tel'), alan('E-posta', 'md_yk_eposta')])]));
-      if (b.satis_bilgisi) {
+      const urunMod = b.urun || (b.satis_bilgisi ? 'zorunlu' : null);
+      if (urunMod) {
         const tumUrun = veri.secenekler.filter((x) => x.tur === 'urun_hizmet');
         const urunler = listeUrunleri().length ? listeUrunleri() : tumUrun;
-        const urunZorunlu = listeUrunleri().length > 0;
-        if (urunler.length) alanlar.push(el('div', null, [el('label', { metin: 'Müşterinin ilgisini çeken ürün / hizmet' + (urunZorunlu ? ' (zorunlu — bu listedeki ürünlerden)' : '') }), el('div', { 'class': 'secenekler' }, urunler.map((u) => el('label', { 'class': 'onay' }, [el('input', { type: 'checkbox', 'data-urun': u.kod }), ' ' + u.etiket])))]));
-        alanlar.push(el('div', { 'class': 'izgara' }, [alan('Adet', 'md_adet', { tip: 'number' }), alan('Tahmini tutar', 'md_tutar', { tip: 'number' })]));
-        alanlar.push(secimChip('İlgi seviyesi', 'md_ilgi', [['', 'Belirtilmedi'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']], ''));
-        alanlar.push(alan('Rakip sözleşme bitiş' + (b.rakip_sozlesme ? ' (zorunlu — bitişten 60 gün önce otomatik aranır)' : ''), 'md_rakip', { tip: 'date' }));
+        if (urunler.length) alanlar.push(el('div', null, [el('label', { metin: 'Müşterinin ilgisini çeken ürün / hizmet' + (urunMod === 'zorunlu' && listeUrunleri().length ? ' (zorunlu)' : '') }), el('div', { 'class': 'secenekler' }, urunler.map((u) => el('label', { 'class': 'onay' }, [el('input', { type: 'checkbox', 'data-urun': u.kod }), ' ' + u.etiket])))]));
       }
+      if (b.rakip_sozlesme) alanlar.push(alan('Rakip sözleşme bitiş tarihi (zorunlu) — bitişten 60 gün önce otomatik aranır', 'md_rakip', { tip: 'date' }));
       alanlar.push(alan('Not' + (b.metin_zorunlu ? ' (zorunlu)' : ''), 'md_not', { cok: true }));
       if (b.aranmayacak === 'musteri') alanlar.push(el('div', { 'class': 'bant', style: 'display:block', metin: 'Bu sonuç müşteriyi "aranmak istemiyor" listesine alır; bir daha aranmaz.' }));
       if (b.aranmayacak === 'kontak') alanlar.push(el('div', { 'class': 'bant', style: 'display:block', metin: 'Bu sonuç seçili yetkiliyi "aranmak istemiyor" listesine alır.' }));
@@ -277,15 +278,13 @@ function aramaModal(kayitId, kapaninca) {
       if (document.getElementById('f_md_tekrar')) g.tekrar_tarihi = yerelTarihIso(v('md_tekrar'));
       if (b.randevu) g.randevu_zamani = yerelTarihIso(v('md_randevu'));
       if (b.yeni_kontak && v('md_yk_ad').trim()) g.yeni_kontak = { ad_soyad: v('md_yk_ad'), gorev: v('md_yk_gorev'), telefon: v('md_yk_tel'), eposta: v('md_yk_eposta') };
-      if (b.satis_bilgisi) {
-        g.urun_kodlari = Array.prototype.map.call(kutu.querySelectorAll('input[data-urun]:checked'), (x) => x.getAttribute('data-urun'));
-        g.adet = v('md_adet'); g.tahmini_tutar = v('md_tutar'); g.ilgi_seviyesi = v('md_ilgi'); g.rakip_sozlesme_bitis = v('md_rakip');
-      }
+      g.urun_kodlari = Array.prototype.map.call(kutu.querySelectorAll('input[data-urun]:checked'), (x) => x.getAttribute('data-urun'));
+      if (b.rakip_sozlesme) g.rakip_sozlesme_bitis = v('md_rakip');
       g.aranan_telefon = telefon();
       const tekrarZorunlu = (d.dal === 'ulasilamadi' && d.kod !== 'numara_yanlis' && !(deneme() >= limit())) || b.tekrar_tarihi === 'zorunlu';
       if (tekrarZorunlu && !g.tekrar_tarihi) { mesaj(hata, 'hata', 'Tekrar arama tarihi zorunludur.'); return; }
       if (b.alt_zorunlu && !g.alt_cevap) { mesaj(hata, 'hata', 'Nedeni seçin.'); return; }
-      if (b.satis_bilgisi && listeUrunleri().length && !(g.urun_kodlari || []).length) { mesaj(hata, 'hata', 'Müşterinin ilgisini çeken ürün/hizmeti işaretleyin.'); return; }
+      if ((b.urun || (b.satis_bilgisi ? 'zorunlu' : null)) === 'zorunlu' && listeUrunleri().length && !(g.urun_kodlari || []).length) { mesaj(hata, 'hata', 'Müşterinin ilgisini çeken ürün/hizmeti işaretleyin.'); return; }
       if (b.rakip_sozlesme && !g.rakip_sozlesme_bitis) { mesaj(hata, 'hata', 'Rakip sözleşme bitiş tarihi zorunludur.'); return; }
       if (b.randevu && !g.randevu_zamani) { mesaj(hata, 'hata', 'Randevu zamanı zorunludur.'); return; }
       if (b.metin_zorunlu && !g.not_metni.trim()) { mesaj(hata, 'hata', 'Bu sonuç için not zorunludur.'); return; }
@@ -295,7 +294,7 @@ function aramaModal(kayitId, kapaninca) {
         aramaId = null; kapat(true);
       });
     } });
-    const sonlandir = (s.ulasildi === false && s.durum && s.durum !== 'numara_yanlis' && deneme() < limit())
+    const sonlandir = (s.ulasildi === false && d && d.dal === 'ulasilamadi' && s.durum !== 'numara_yanlis' && deneme() < limit())
       ? el('button', { type: 'button', 'class': 'tehlike', metin: 'Ulaşılamıyor — görevi sonlandır', onclick: () => {
         if (!confirm('Görev sonlandırılsın mı? Bu müşteri "Ulaşılamıyor" olarak kapanır.')) return;
         api('/api/arama/' + aramaId + '/tamamla', { durum_kodu: 'ulasilamiyor', kontak_id: s.kontak_id || null, not_metni: (document.getElementById('f_md_not') || {}).value || '' }).then((r) => {

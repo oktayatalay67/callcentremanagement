@@ -141,6 +141,7 @@ function baslik(metin, sag) {
 
 // ---------------- Surum notlari (her yayinda en uste eklenir) ----------------
 const SURUM_NOTLARI = [
+  ['0.9.1', 'Görüşme sonucu Olumlu / Olumsuz / Belirsiz olarak dallanır; demo istiyor = randevu; tutar, adet ve ilgi seviyesi kaldırıldı; ekrandaki alanlar yalnız seçilen sonuca göre görünür.'],
   ['0.9.0', 'Onaylı arama durumları kataloğu (23 sonuç): alt neden, rakip sözleşmesi (bitişten 60 gün önce otomatik arama), kişi ayrılmış, takip limiti 6, uyarı bantları; görüşme sonunda listedeki ürünlerden ilgi çeken işaretlenir.'],
   ['0.8.3', 'Arama listesi oluştururken birden fazla ürün/hizmet işaretlenir; agent arama ekranında listenin hangi ürünler için arandığını görür.'],
   ['0.8.2', 'Arama ekranı SSSO akışına göre düzeltildi: yetkililer alt alta (görev, e-posta, önceki arama), önceki aramalar görünür, arama nedeni başta, açılır liste yok, numara yanlış / ulaşılamadı / 5 deneme kuralı.'],

@@ -46,8 +46,9 @@ async function firmaDuzelt(q, kod) {
   DUZELTILEN.add(kod);
 }
 // v0.9.0: onayli "Arama Durumlari ve Akis Katalogu". Marker ile firma basina TEK kez calisir.
-const KATALOG_SURUM = '0.9.0';
+const KATALOG_SURUM = '0.9.1';
 const ILGISIZ_ALT = ['Bütçe yok', 'İhtiyaç yok', 'Zamanlama uygun değil', 'Mevcut çözümden memnun'];
+// Sonuc grubu: olumlu / olumsuz / beklemede (= "Belirsiz"). Ekrandaki alanlar yalniz buradaki bayraklardan turetilir.
 const KATALOG = [
   // kod, etiket, dal, kutu, sonuc_grubu, bayraklar, sira
   ['telefon_cevap_yok', 'Cevap yok', 'ulasilamadi', 'ulasilamadi', 'ulasilamadi', { tekrar_tarihi: 'zorunlu' }, 10],
@@ -59,17 +60,19 @@ const KATALOG = [
   ['kisi_ayrilmis', 'Kişi ayrılmış', 'muhatap_degil', 'tekrar', 'beklemede', { yeni_kontak: true, kisi_pasif: true, tekrar_tarihi: 'opsiyonel' }, 110],
   ['baska_kisiye_yonlendirdi', 'Başka kişiye yönlendirdi', 'muhatap_degil', 'tekrar', 'beklemede', { yeni_kontak: true, tekrar_tarihi: 'opsiyonel' }, 120],
   ['yetkili_musait_degil', 'Yetkili şu an müsait değil', 'muhatap_degil', 'tekrar', 'beklemede', { tekrar_tarihi: 'zorunlu' }, 130],
-  ['sonra_aranmak_istiyor', 'Geri arama istiyor', 'uygun_degil', 'tekrar', 'beklemede', { tekrar_tarihi: 'zorunlu' }, 210],
-  ['aranmak_istemiyor', 'Aranmak istemiyor', 'uygun_degil', 'tamam', 'olumsuz', { aranmayacak: 'musteri' }, 220],
-  ['ilgilenmiyor', 'İlgilenmiyor', 'bilgi_verildi', 'tamam', 'olumsuz', { potansiyel_yok: true, alt_secenekler: ILGISIZ_ALT, alt_zorunlu: true }, 310],
-  ['rakip_sozlesmesi', 'Rakip sözleşmesi var', 'bilgi_verildi', 'tekrar', 'beklemede', { rakip_sozlesme: true, satis_bilgisi: true }, 320],
-  ['bilgi_talep_etti', 'Bilgi / sunum istiyor', 'bilgi_verildi', 'tekrar', 'olumlu', { gorev_ac: true, satis_bilgisi: true, tekrar_tarihi: 'opsiyonel' }, 330],
-  ['ilgileniyor_takip', 'İlgileniyor, tekrar görüşülecek', 'bilgi_verildi', 'tekrar', 'olumlu', { satis_bilgisi: true, tekrar_tarihi: 'zorunlu' }, 340],
-  ['randevu_alindi', 'Randevu alındı', 'bilgi_verildi', 'tamam', 'olumlu', { randevu: true, satis_bilgisi: true }, 350],
-  ['teklif_demo_istedi', 'Teklif / demo istedi', 'bilgi_verildi', 'tamam', 'olumlu', { gorev_ac: true, satis_bilgisi: true, tekrar_tarihi: 'opsiyonel' }, 360],
-  ['zaten_musteri', 'Zaten müşteri', 'bilgi_verildi', 'tamam', 'beklemede', { gorev_ac: true, satis_bilgisi: true }, 370],
-  ['sikayet_destek', 'Şikayet / destek talebi', 'bilgi_verildi', 'tamam', 'beklemede', { gorev_ac: true, metin_zorunlu: true }, 380],
-  ['aramasiz_firma_kapandi', 'Firma kapalı / faaliyette değil', 'aramasiz', 'tamam', 'olumsuz', { potansiyel_yok: true }, 410],
+  // Olumlu
+  ['teklif_demo_istedi', 'Demo istiyor (randevu)', 'bilgi_verildi', 'tamam', 'olumlu', { randevu: true, urun: 'zorunlu' }, 310],
+  ['bilgi_talep_etti', 'E-posta ile açıklama istiyor', 'bilgi_verildi', 'tamam', 'olumlu', { gorev_ac: true, urun: 'zorunlu' }, 320],
+  // Olumsuz
+  ['ilgilenmiyor', 'İlgilenmiyor', 'bilgi_verildi', 'tamam', 'olumsuz', { potansiyel_yok: true, alt_secenekler: ILGISIZ_ALT, alt_zorunlu: true }, 330],
+  ['aranmak_istemiyor', 'Aranmak istemiyor', 'uygun_degil', 'tamam', 'olumsuz', { aranmayacak: 'musteri' }, 340],
+  // Belirsiz
+  ['ilgileniyor_takip', 'İlgileniyor, tekrar görüşülecek', 'bilgi_verildi', 'tekrar', 'beklemede', { urun: 'zorunlu', tekrar_tarihi: 'zorunlu' }, 350],
+  ['rakip_sozlesmesi', 'Rakip sözleşmesi var', 'bilgi_verildi', 'tekrar', 'beklemede', { rakip_sozlesme: true, urun: 'opsiyonel' }, 360],
+  ['sonra_aranmak_istiyor', 'Geri arama istiyor', 'uygun_degil', 'tekrar', 'beklemede', { tekrar_tarihi: 'zorunlu' }, 370],
+  ['zaten_musteri', 'Zaten müşteri', 'bilgi_verildi', 'tamam', 'beklemede', { gorev_ac: true }, 380],
+  ['sikayet_destek', 'Şikayet / destek talebi', 'bilgi_verildi', 'tamam', 'beklemede', { gorev_ac: true, metin_zorunlu: true }, 390],
+  ['aramasiz_firma_kapandi', 'Firma kapalı / iflas / faaliyette değil', 'aramasiz', 'tamam', 'olumsuz', { potansiyel_yok: true }, 410],
   ['aramasiz_mukerrer', 'Mükerrer kayıt', 'aramasiz', 'tamam', 'olumsuz', {}, 420],
   ['aramasiz_kapsam_disi', 'Kapsam dışı', 'aramasiz', 'tamam', 'olumsuz', { potansiyel_yok: true }, 430],
 ];
@@ -85,7 +88,7 @@ async function katalogGuncelle(q, kod) {
       [dk, etiket, dal, kutu, grup, JSON.stringify(bay), sira]);
   }
   // Katalogdan kalkan sistem sonuclari: gecmis kayitlar bozulmasin diye silinmez, pasife alinir
-  await q(`UPDATE ${D} SET aktif = false, guncelleme = now() WHERE kod IN ('yetkili_yanlis', 'telefonu_acan_yetkili_degil', 'bilgi_verildi', 'aramasiz_diger')`);
+  await q(`UPDATE ${D} SET aktif = false, guncelleme = now() WHERE kod IN ('yetkili_yanlis', 'telefonu_acan_yetkili_degil', 'bilgi_verildi', 'aramasiz_diger', 'randevu_alindi')`);
   // "Ulasilamiyor" gorevi kendiliginden geri kuyruga girmez; takip limiti 6
   await q(`UPDATE ${A} SET deger = '0' WHERE anahtar = 'cooldown_gun' AND deger = '30'`);
   await q(`INSERT INTO ${A} (anahtar, deger, aciklama) VALUES ('takip_limiti', '6', 'Ulaşılan müşteri için en fazla görüşme sayısı; dolunca görev kapanır')
@@ -514,9 +517,10 @@ export function aramaRotalari(app) {
     let randevu = null;
     if (bay.randevu) { randevu = tarihOku(g.randevu_zamani, 'Randevu zamanı'); if (!randevu) throw new HttpHata(400, 'Randevu zamanı zorunludur.'); }
 
-    // Satis bilgisi
-    let urunKodlari = []; let adet = null; let tutar = null; let ilgi = null; let rakip = null;
-    if (bay.satis_bilgisi) {
+    // Urun secimi (zorunlu/opsiyonel) ve rakip sozlesme tarihi: yalniz ilgili sonuclarda
+    let urunKodlari = []; const adet = null; const tutar = null; const ilgi = null; let rakip = null;
+    const urunMod = bay.urun || (bay.satis_bilgisi ? 'zorunlu' : null);
+    if (urunMod) {
       const listeUrun = String(lk.urun_odak || '').split(',').filter(Boolean);
       if (Array.isArray(g.urun_kodlari) && g.urun_kodlari.length) {
         let kodlar = [...new Set(g.urun_kodlari.map(norm).filter((x) => KOD_RE.test(x)))].slice(0, 20);
@@ -524,12 +528,12 @@ export function aramaRotalari(app) {
         const gecerli = await q(`SELECT kod FROM ${T(kod, 'secenekler')} WHERE tur = 'urun_hizmet' AND aktif AND kod = ANY($1::text[])`, [kodlar]);
         urunKodlari = gecerli.rows.map((x) => x.kod);
       }
-      if (listeUrun.length && !urunKodlari.length && !ekOrijinal) throw new HttpHata(400, 'Müşterinin ilgisini çeken ürün/hizmeti işaretleyin.');
-      if (g.adet !== undefined && g.adet !== null && g.adet !== '') { adet = Number(g.adet); if (!Number.isInteger(adet) || adet < 0 || adet > 1000000) throw new HttpHata(400, 'Adet geçersiz.'); }
-      if (g.tahmini_tutar !== undefined && g.tahmini_tutar !== null && g.tahmini_tutar !== '') { tutar = Number(g.tahmini_tutar); if (!isFinite(tutar) || tutar < 0 || tutar > 1e12) throw new HttpHata(400, 'Tahmini tutar geçersiz.'); }
-      if (g.ilgi_seviyesi !== undefined && g.ilgi_seviyesi !== null && g.ilgi_seviyesi !== '') { ilgi = Number(g.ilgi_seviyesi); if (!Number.isInteger(ilgi) || ilgi < 1 || ilgi > 5) throw new HttpHata(400, 'İlgi seviyesi 1-5 olmalı.'); }
-      if (bay.rakip_sozlesme && !g.rakip_sozlesme_bitis) throw new HttpHata(400, 'Rakip sözleşme bitiş tarihi zorunludur.');
-      if (g.rakip_sozlesme_bitis) { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(g.rakip_sozlesme_bitis))) throw new HttpHata(400, 'Rakip sözleşme bitiş tarihi geçersiz.'); rakip = g.rakip_sozlesme_bitis; }
+      if (urunMod === 'zorunlu' && listeUrun.length && !urunKodlari.length && !ekOrijinal) throw new HttpHata(400, 'Müşterinin ilgisini çeken ürün/hizmeti işaretleyin.');
+    }
+    if (bay.rakip_sozlesme) {
+      if (!g.rakip_sozlesme_bitis) throw new HttpHata(400, 'Rakip sözleşme bitiş tarihi zorunludur.');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(g.rakip_sozlesme_bitis))) throw new HttpHata(400, 'Rakip sözleşme bitiş tarihi geçersiz.');
+      rakip = g.rakip_sozlesme_bitis;
     }
     const nedenKodu = arama.neden_kodu || null; const kanal = arama.kanal_kodu || 'telefon';
 
@@ -662,6 +666,7 @@ export function aramaRotalari(app) {
     if (!b || typeof b !== 'object') return o;
     if (['zorunlu', 'opsiyonel'].includes(b.tekrar_tarihi)) o.tekrar_tarihi = b.tekrar_tarihi;
     for (const a of ['yeni_kontak', 'gorev_ac', 'randevu', 'satis_bilgisi', 'potansiyel_yok', 'metin_zorunlu']) if (b[a] === true) o[a] = true;
+    if (['zorunlu', 'opsiyonel'].includes(b.urun)) o.urun = b.urun;
     for (const a of ['rakip_sozlesme', 'kisi_pasif', 'alt_zorunlu']) if (b[a] === true) o[a] = true;
     if (['musteri', 'kontak'].includes(b.aranmayacak)) o.aranmayacak = b.aranmayacak;
     if (Array.isArray(b.alt_secenekler)) {
