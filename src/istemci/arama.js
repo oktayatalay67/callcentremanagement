@@ -48,6 +48,7 @@ function sayfaArama() {
             el('div', { style: 'font-weight:600', metin: r.unvan }),
             el('div', { 'class': 'alt', metin: [r.sektor, [r.il, r.ilce].filter(Boolean).join(' / ')].filter(Boolean).join(' · ') }),
             el('div', { 'class': 'alt', metin: (r.telefon || 'Telefon yok') + ' · ' + r.liste_ad + (r.kontak_sayisi ? ' · ' + r.kontak_sayisi + ' yetkili' : '') }),
+            r.urunler ? el('div', { 'class': 'alt', metin: 'Ürünler: ' + r.urunler }) : null,
             yasak ? el('div', { 'class': 'bant', metin: 'Aranmak istemeyen yetkili var' }) : null,
             r.kilitli ? el('div', { 'class': 'bant', metin: 'Şu anda başka bir kullanıcı arıyor' }) : null,
           ]),
@@ -97,9 +98,22 @@ function aramaModal(kayitId, kapaninca) {
   function telefon() { const kt = secKontak(); return (kt && (kt.telefon || kt.telefon2)) || veri.kayit.telefon || ''; }
   const nedenler = () => veri.secenekler.filter((x) => x.tur === 'gorusme_nedeni');
   const nedenEtiket = () => { const n = nedenler().find((x) => x.kod === s.neden); return n ? n.etiket : ''; };
+  const listeUrunleri = () => {
+    const kodlar = (veri.kayit.urun_odak || '').split(',').filter(Boolean);
+    return veri.secenekler.filter((x) => x.tur === 'urun_hizmet' && kodlar.indexOf(x.kod) >= 0);
+  };
   const deneme = () => veri.kayit.deneme_sayisi + 1;
   const limit = () => veri.kayit.deneme_limiti || veri.ayar.deneme_limiti;
 
+  // Yumusak uyarilar (engellemez): gunde 2 deneme, deneme arasi 4 saat, 09:00-17:00 araligi
+  function uyarilar() {
+    const u = []; const k = veri.kayit; const simdi = new Date();
+    if (k.bugun_adet >= 2) u.push('Bu müşteri bugün ' + k.bugun_adet + ' kez arandı; günde en fazla 2 deneme önerilir.');
+    if (k.son_arama_zaman && (simdi - new Date(k.son_arama_zaman)) < 4 * 3600000 && k.bugun_adet < 2) u.push('Son arama 4 saatten kısa süre önce yapıldı; denemeler arasında en az 4 saat önerilir.');
+    const sa = simdi.getHours();
+    if (sa < 9 || sa >= 17) u.push('Arama saati 09:00-17:00 aralığının dışında.');
+    return u;
+  }
   function ustBilgi() {
     const m = veri.kayit;
     return el('div', null, [
@@ -109,6 +123,8 @@ function aramaModal(kayitId, kapaninca) {
       el('div', { 'class': 'alt', style: 'margin:2px 0', metin: [m.dis_no, m.sektor, [m.il, m.ilce].filter(Boolean).join(' / '), m.liste_ad].filter(Boolean).join(' · ') }),
       m.adres ? el('div', { 'class': 'alt', style: 'margin:2px 0', metin: m.adres }) : null,
       veri.musteri_yasakli ? el('div', { 'class': 'bant', metin: 'Bu müşteri aranmak istemiyor.' }) : null,
+      uyarilar().length ? el('div', null, uyarilar().map((u) => el('div', { 'class': 'bant', style: 'display:block', metin: u }))) : null,
+      listeUrunleri().length ? el('div', { 'class': 'urunband' }, [el('b', { metin: 'Bu listede aranan ürünler: ' }), listeUrunleri().map((u) => u.etiket).join(', ')]) : null,
     ]);
   }
   // Yetkili listesi: alt alta, ad soyad / gorev / e-posta / telefon, onceki arama ozeti
@@ -124,6 +140,7 @@ function aramaModal(kayitId, kapaninca) {
           x.karar_verici ? el('span', { 'class': 'rozet yesil', metin: 'Karar verici' }) : null,
           x.aranmayacak ? el('span', { 'class': 'bant', style: 'margin:0', metin: 'ARANMAK İSTEMİYOR' }) : null,
           x.numara_yanlis ? el('span', { 'class': 'bant', style: 'margin:0', metin: 'NUMARA YANLIŞ — ulaşılamadı' }) : null,
+          x.bos_adet >= 3 && !x.numara_yanlis ? el('span', { 'class': 'bant', style: 'margin:0', metin: x.bos_adet + ' kez ulaşılamadı — başka kişi/numara deneyin' }) : null,
         ]),
         el('div', { 'class': 'alt', style: 'margin:2px 0 0 22px', metin: 'Görevi: ' + (x.gorev || '-') + ' · E-posta: ' + (x.eposta || '-') + ' · Tel: ' + ([x.telefon, x.telefon2].filter(Boolean).join(' / ') || '-') }),
         el('div', { 'class': 'alt', style: 'margin:2px 0 0 22px', metin: x.arama_adet ? 'Bu kişiyle ' + x.arama_adet + ' arama · son: ' + (x.son_sonuc || '-') + ' (' + tarih(x.son_zaman) + ')' : 'Bu kişi daha önce aranmadı' }),
@@ -231,15 +248,18 @@ function aramaModal(kayitId, kapaninca) {
       const b = d.bayraklar || {};
       const alanlar = [el('div', { 'class': 'rozet yesil', style: 'margin-top:12px', metin: 'Seçilen sonuç: ' + d.etiket })].concat(ekPaneller);
       if (d.alt_soru) alanlar.push(alan(d.alt_soru, 'md_alt'));
+      if (b.alt_secenekler && b.alt_secenekler.length) alanlar.push(secimChip('Neden' + (b.alt_zorunlu ? ' (zorunlu)' : ''), 'md_alt', (b.alt_zorunlu ? [] : [['', 'Belirtilmedi']]).concat(b.alt_secenekler.map((x) => [x, x])), ''));
       if (d.dal !== 'ulasilamadi' && b.tekrar_tarihi) alanlar.push(tekrarAlani(b.tekrar_tarihi === 'zorunlu'));
       if (b.randevu) alanlar.push(el('div', null, [el('label', { 'for': 'f_md_randevu', metin: 'Randevu zamanı (zorunlu)' }), el('input', { type: 'datetime-local', id: 'f_md_randevu' })]));
       if (b.yeni_kontak) alanlar.push(el('div', { 'class': 'soru' }, [el('div', { style: 'font-weight:600', metin: d.dal === 'muhatap_degil' ? 'Doğru kişinin bilgileri (biliyorsanız)' : 'Yeni yetkili' }), el('div', { 'class': 'izgara' }, [alan('Ad soyad', 'md_yk_ad'), alan('Görev', 'md_yk_gorev'), alan('Telefon', 'md_yk_tel'), alan('E-posta', 'md_yk_eposta')])]));
       if (b.satis_bilgisi) {
-        const urunler = veri.secenekler.filter((x) => x.tur === 'urun_hizmet');
-        if (urunler.length) alanlar.push(el('div', null, [el('label', { metin: 'İlgilenilen ürün / hizmet' }), el('div', { 'class': 'secenekler' }, urunler.map((u) => el('label', { 'class': 'onay' }, [el('input', { type: 'checkbox', 'data-urun': u.kod }), ' ' + u.etiket])))]));
+        const tumUrun = veri.secenekler.filter((x) => x.tur === 'urun_hizmet');
+        const urunler = listeUrunleri().length ? listeUrunleri() : tumUrun;
+        const urunZorunlu = listeUrunleri().length > 0;
+        if (urunler.length) alanlar.push(el('div', null, [el('label', { metin: 'Müşterinin ilgisini çeken ürün / hizmet' + (urunZorunlu ? ' (zorunlu — bu listedeki ürünlerden)' : '') }), el('div', { 'class': 'secenekler' }, urunler.map((u) => el('label', { 'class': 'onay' }, [el('input', { type: 'checkbox', 'data-urun': u.kod }), ' ' + u.etiket])))]));
         alanlar.push(el('div', { 'class': 'izgara' }, [alan('Adet', 'md_adet', { tip: 'number' }), alan('Tahmini tutar', 'md_tutar', { tip: 'number' })]));
         alanlar.push(secimChip('İlgi seviyesi', 'md_ilgi', [['', 'Belirtilmedi'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']], ''));
-        alanlar.push(alan('Rakip sözleşme bitiş', 'md_rakip', { tip: 'date' }));
+        alanlar.push(alan('Rakip sözleşme bitiş' + (b.rakip_sozlesme ? ' (zorunlu — bitişten 60 gün önce otomatik aranır)' : ''), 'md_rakip', { tip: 'date' }));
       }
       alanlar.push(alan('Not' + (b.metin_zorunlu ? ' (zorunlu)' : ''), 'md_not', { cok: true }));
       if (b.aranmayacak === 'musteri') alanlar.push(el('div', { 'class': 'bant', style: 'display:block', metin: 'Bu sonuç müşteriyi "aranmak istemiyor" listesine alır; bir daha aranmaz.' }));
@@ -264,6 +284,9 @@ function aramaModal(kayitId, kapaninca) {
       g.aranan_telefon = telefon();
       const tekrarZorunlu = (d.dal === 'ulasilamadi' && d.kod !== 'numara_yanlis' && !(deneme() >= limit())) || b.tekrar_tarihi === 'zorunlu';
       if (tekrarZorunlu && !g.tekrar_tarihi) { mesaj(hata, 'hata', 'Tekrar arama tarihi zorunludur.'); return; }
+      if (b.alt_zorunlu && !g.alt_cevap) { mesaj(hata, 'hata', 'Nedeni seçin.'); return; }
+      if (b.satis_bilgisi && listeUrunleri().length && !(g.urun_kodlari || []).length) { mesaj(hata, 'hata', 'Müşterinin ilgisini çeken ürün/hizmeti işaretleyin.'); return; }
+      if (b.rakip_sozlesme && !g.rakip_sozlesme_bitis) { mesaj(hata, 'hata', 'Rakip sözleşme bitiş tarihi zorunludur.'); return; }
       if (b.randevu && !g.randevu_zamani) { mesaj(hata, 'hata', 'Randevu zamanı zorunludur.'); return; }
       if (b.metin_zorunlu && !g.not_metni.trim()) { mesaj(hata, 'hata', 'Bu sonuç için not zorunludur.'); return; }
       kaydet.disabled = true;
@@ -284,16 +307,32 @@ function aramaModal(kayitId, kapaninca) {
 }
 
 // ================= ARAMA LISTELERI (yonetici) =================
+// Urun secimi: birden fazla isaretlenebilir (onay kutulari). secili: kod dizisi
+function urunSecici(kap, secili) {
+  api('/api/urun-secenekleri').then((r) => {
+    kap.innerHTML = '';
+    if (!r.ok) { kap.appendChild(el('span', { 'class': 'alt', metin: 'Ürün listesi alınamadı.' })); return; }
+    if (!r.j.urunler.length) { kap.appendChild(el('span', { 'class': 'alt', metin: 'Tanımlı ürün yok. "Arama ayarları" ekranından ürün/hizmet ekleyin.' })); return; }
+    r.j.urunler.forEach((u) => {
+      const cb = el('input', { type: 'checkbox', 'data-lurun': u.kod }); cb.checked = (secili || []).indexOf(u.kod) >= 0;
+      kap.appendChild(el('label', { 'class': 'onay' }, [cb, ' ' + u.etiket]));
+    });
+  });
+}
+function seciliUrunler(kap) { return Array.prototype.map.call(kap.querySelectorAll('input[data-lurun]:checked'), (x) => x.getAttribute('data-lurun')); }
+
 function sayfaListeler() {
   icerik.appendChild(baslik('Arama listeleri'));
   const yeniKap = el('div'); const liste = el('div'); const detay = el('div');
   icerik.appendChild(yeniKap); icerik.appendChild(detay); icerik.appendChild(liste);
 
   const hata = el('div', { style: 'display:none' });
-  yeniKap.appendChild(panel([el('h3', { metin: 'Yeni liste' }), el('div', { 'class': 'izgara' }, [alan('Liste adı', 'nl_ad'), alan('Deneme limiti (boşsa firma ayarı)', 'nl_limit', { tip: 'number' }), alan('Ürün odağı', 'nl_urun')]),
+  const nlUrunKap = el('div', { 'class': 'secenekler' }); urunSecici(nlUrunKap, []);
+  yeniKap.appendChild(panel([el('h3', { metin: 'Yeni liste' }), el('div', { 'class': 'izgara' }, [alan('Liste adı', 'nl_ad'), alan('Deneme limiti (boşsa firma ayarı)', 'nl_limit', { tip: 'number' })]),
+    el('div', { style: 'margin-bottom:10px' }, [el('label', { metin: 'Bu liste hangi ürün/hizmetler için aranacak? (birden fazla işaretlenebilir)' }), nlUrunKap]),
     alan('Açıklama', 'nl_acik'), alan('Konuşma metni (agent ekranında görünür)', 'nl_konusma', { cok: true }),
     el('div', { 'class': 'satir' }, [el('button', { type: 'button', metin: 'Liste oluştur', onclick: () => {
-      api('/api/listeler', { ad: deger('nl_ad'), deneme_limiti: deger('nl_limit'), urun_odak: deger('nl_urun'), aciklama: deger('nl_acik'), konusma_metni: deger('nl_konusma') }).then((s) => {
+      api('/api/listeler', { ad: deger('nl_ad'), deneme_limiti: deger('nl_limit'), urun_kodlari: seciliUrunler(nlUrunKap), aciklama: deger('nl_acik'), konusma_metni: deger('nl_konusma') }).then((s) => {
         if (!s.ok) { mesaj(hata, 'hata', hataMetni(s)); return; }
         getir(s.j.id);
       });
@@ -319,6 +358,7 @@ function sayfaListeler() {
       bos(detay);
       if (!s.ok) { detay.appendChild(el('div', { 'class': 'hata', metin: hataMetni(s) })); return; }
       const l = s.j.liste; const mk = el('div', { style: 'display:none' });
+      const ldUrunKap = el('div', { 'class': 'secenekler' }); urunSecici(ldUrunKap, (l.urun_odak || '').split(',').filter(Boolean));
       const dag = el('table', null, [el('thead', null, [el('tr', null, ['Kullanıcı', 'Toplam', 'Yeni', 'Tekrar', 'Ulaşılamayan', 'Tamam'].map((h) => el('th', { metin: h })))]),
         el('tbody', null, s.j.dagilim.map((x) => el('tr', null, [x.ad, x.toplam, x.yeni, x.tekrar, x.ulasilamadi, x.tamam].map((v) => el('td', { metin: String(v) })))))]);
       const kullKap = el('div', { 'class': 'secenekler' });
@@ -339,11 +379,11 @@ function sayfaListeler() {
       const yaz = (mesajMetni, sinif) => mesaj(mk, sinif || 'basari', mesajMetni);
       detay.appendChild(panel([
         el('h3', { metin: 'Liste: ' + l.ad }),
-        el('div', { 'class': 'izgara' }, [alan('Ad', 'ld_ad', { deger: l.ad }), alan('Deneme limiti', 'ld_limit', { tip: 'number', deger: l.deneme_limiti || '' }), alan('Ürün odağı', 'ld_urun', { deger: l.urun_odak || '' }),
-          secimChip('Durum', 'ld_durum', [['hazirlik', 'Hazırlık'], ['aktif', 'Aktif'], ['durdu', 'Durdu'], ['bitti', 'Bitti']], l.durum)]),
+        el('div', { 'class': 'izgara' }, [alan('Ad', 'ld_ad', { deger: l.ad }), alan('Deneme limiti', 'ld_limit', { tip: 'number', deger: l.deneme_limiti || '' }),           secimChip('Durum', 'ld_durum', [['hazirlik', 'Hazırlık'], ['aktif', 'Aktif'], ['durdu', 'Durdu'], ['bitti', 'Bitti']], l.durum)]),
+        el('div', { style: 'margin-bottom:10px' }, [el('label', { metin: 'Bu liste hangi ürün/hizmetler için aranacak?' }), ldUrunKap]),
         alan('Açıklama', 'ld_acik', { deger: l.aciklama || '' }), alan('Konuşma metni', 'ld_konusma', { cok: true, deger: l.konusma_metni || '' }),
         el('div', { 'class': 'satir' }, [
-          el('button', { type: 'button', metin: 'Kaydet', onclick: () => api('/api/listeler/' + id, { ad: deger('ld_ad'), deneme_limiti: deger('ld_limit'), urun_odak: deger('ld_urun'), durum: deger('ld_durum'), aciklama: deger('ld_acik'), konusma_metni: deger('ld_konusma') }, 'PATCH').then((r) => { if (r.ok) getir(id); else yaz(hataMetni(r), 'hata'); }) }),
+          el('button', { type: 'button', metin: 'Kaydet', onclick: () => api('/api/listeler/' + id, { ad: deger('ld_ad'), deneme_limiti: deger('ld_limit'), urun_kodlari: seciliUrunler(ldUrunKap), durum: deger('ld_durum'), aciklama: deger('ld_acik'), konusma_metni: deger('ld_konusma') }, 'PATCH').then((r) => { if (r.ok) getir(id); else yaz(hataMetni(r), 'hata'); }) }),
           eylemVar('liste_sil') ? el('button', { type: 'button', 'class': 'tehlike', metin: 'Listeyi sil', onclick: () => { if (confirm('Liste silinsin mi?')) api('/api/listeler/' + id, null, 'DELETE').then((r) => { if (r.ok) { bos(detay); getir(); } else yaz(hataMetni(r), 'hata'); }); } }) : null]),
         el('h3', { metin: 'Müşteri ekle ve dağıt' }), filtre,
         el('label', { 'class': 'onay' }, [el('input', { type: 'checkbox', id: 'f_ld_atanmamis' }), ' Sadece kimseye atanmamış müşteriler']),
@@ -374,8 +414,9 @@ function sayfaAyarlar() {
       kok2.appendChild(panel([el('h3', { metin: 'Genel kurallar' }), el('div', { 'class': 'izgara' }, [
         alan('Deneme limiti (ulaşılamayan için)', 'ay_limit', { tip: 'number', deger: j.ayar.deneme_limiti }),
         alan('Bekleme süresi (gün)', 'ay_cool', { tip: 'number', deger: j.ayar.cooldown_gun }),
+        alan('Takip limiti (ulaşılan görüşme sayısı)', 'ay_takip', { tip: 'number', deger: j.ayar.takip_limiti }),
         alan('Kayıt kilidi (dakika)', 'ay_kilit', { tip: 'number', deger: j.ayar.kilit_dakika })]),
-        el('div', { 'class': 'satir' }, [el('button', { type: 'button', metin: 'Kaydet', onclick: () => api('/api/arama-ayarlari/sayisal', { deneme_limiti: deger('ay_limit'), cooldown_gun: deger('ay_cool'), kilit_dakika: deger('ay_kilit') }, 'PUT').then(hepsi) })]), mk]));
+        el('div', { 'class': 'satir' }, [el('button', { type: 'button', metin: 'Kaydet', onclick: () => api('/api/arama-ayarlari/sayisal', { deneme_limiti: deger('ay_limit'), cooldown_gun: deger('ay_cool'), takip_limiti: deger('ay_takip'), kilit_dakika: deger('ay_kilit') }, 'PUT').then(hepsi) })]), mk]));
       // Durumlar
       const gruplar = {};
       j.durumlar.forEach((d) => { (gruplar[d.dal] = gruplar[d.dal] || []).push(d); });

@@ -141,6 +141,8 @@ function baslik(metin, sag) {
 
 // ---------------- Surum notlari (her yayinda en uste eklenir) ----------------
 const SURUM_NOTLARI = [
+  ['0.9.0', 'Onaylı arama durumları kataloğu (23 sonuç): alt neden, rakip sözleşmesi (bitişten 60 gün önce otomatik arama), kişi ayrılmış, takip limiti 6, uyarı bantları; görüşme sonunda listedeki ürünlerden ilgi çeken işaretlenir.'],
+  ['0.8.3', 'Arama listesi oluştururken birden fazla ürün/hizmet işaretlenir; agent arama ekranında listenin hangi ürünler için arandığını görür.'],
   ['0.8.2', 'Arama ekranı SSSO akışına göre düzeltildi: yetkililer alt alta (görev, e-posta, önceki arama), önceki aramalar görünür, arama nedeni başta, açılır liste yok, numara yanlış / ulaşılamadı / 5 deneme kuralı.'],
   ['0.8.1', 'Aynı ünvanlı müşteriler tek kayıtta toplanır (yüklemede otomatik); mevcut mükerrer kayıtlar için "Mükerrer müşterileri birleştir" düğmesi.'],
   ['0.8.0', 'Arama modülü: arama listeleri ve agent dağıtımı, agent arama ekranı (Yeni / Tekrar / Ulaşılamayan / Tamamlanan), SSSO arama akışı, takvim, arama ayarları.'],
